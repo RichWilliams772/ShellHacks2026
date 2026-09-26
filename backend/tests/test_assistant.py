@@ -11,6 +11,13 @@ from app.config import Settings
 from app.main import create_app
 
 client = TestClient(create_app(settings=Settings()))
+
+
+@pytest.fixture(autouse=True)
+def _no_live_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GRIDSYNC_LLM_API_KEY", raising=False)
+
+
 ASSISTANT_SOURCE = (
     Path(__file__).resolve().parents[1] / "app" / "assistant.py"
 ).read_text(encoding="utf-8")

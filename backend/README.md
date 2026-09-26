@@ -1,9 +1,9 @@
 # GridSync backend
 
-FastAPI service for cross-utility coordination opportunities. Project retrieval
-can load Aaron's processed Duke and TECO CSVs. Opportunity scores stay on the
-labeled demo catalog until analysis is wired to those records. This backend
-does not scrape filings.
+FastAPI service for cross-utility coordination opportunities. With the processed
+Duke and TECO catalogs selected, `POST /analyze` returns Aaron's precomputed
+public opportunities (160 evaluated pairs, 50 eligible). Explicit demo mode
+still scores the labeled demo fixtures. This backend does not scrape filings.
 
 ## Run
 
@@ -86,29 +86,35 @@ Provenance fields:
 
 The loader does not check that a `public` row is actually a Duke or TECO filing. It only requires the provenance fields to be present.
 
-## Opportunity explanation
+## Dashboard chat
 
-`POST /assistant/query` still filters structured results when `opportunity_id` is omitted, and `llm_used` stays false. Supply `opportunity_id` to explain one opportunity that `/analyze` already returned. The server sends that opportunity's evidence to one chat-completions call. The model is instructed not to invent distances, dates, scores, resources, savings, or a recommendation. `llm_used` is true only when that call returns text.
+`POST /assistant/query` answers questions about the loaded opportunities. It filters the structured results first, then sends at most five matching records to one chat-completions call. `opportunity_id` is optional: when it is set, the call receives only that opportunity. `messages` is an optional list of prior `{role, content}` turns (`user` or `assistant` only, at most the latest eight, and only the latest six are sent). The current question stays in `query`. There is no stored conversation.
 
-Set these in the environment. Do not commit the key.
+The model may explain those records, answer a follow-up, and describe the dashboard: choose the two utilities, run analysis, filter by year, project type, maximum endpoint distance, and minimum coordination score, then open a card or the map. It must not invent distances, dates, scores, resources, sources, savings, or a recommendation. `llm_used` is true only when that call returns text. With no API key, or if the provider fails, the response keeps the filtered opportunities and a structured answer, and `llm_used` is false.
+
+The chat call is one OpenAI-compatible chat completion. Gemini is configured with a Gemini API key, model `gemini-2.5-flash`, and base URL `https://generativelanguage.googleapis.com/v1beta/openai`. The client posts to `{base}/chat/completions` and verifies TLS with the `certifi` CA bundle. Do not commit the key.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `GRIDSYNC_LLM_API_KEY` | yes, for a model call | Bearer token. Absent key returns the structured record and `llm_used: false`. |
-| `GRIDSYNC_LLM_MODEL` | no | Chat model. Defaults to `gpt-4o-mini`. |
-| `GRIDSYNC_LLM_BASE_URL` | no | OpenAI-compatible API origin. Defaults to `https://api.openai.com/v1`. |
+| `GRIDSYNC_LLM_MODEL` | no | Chat model. Gemini: `gemini-2.5-flash`. If unset, `gpt-4o-mini`. |
+| `GRIDSYNC_LLM_BASE_URL` | no | API origin without `/chat/completions`. Gemini: `https://generativelanguage.googleapis.com/v1beta/openai`. If unset, `https://api.openai.com/v1`. |
 
 ```bash
-export GRIDSYNC_LLM_API_KEY="your-key"
-export GRIDSYNC_LLM_MODEL="gpt-4o-mini"
-export GRIDSYNC_LLM_BASE_URL="https://api.openai.com/v1"
+export GRIDSYNC_LLM_API_KEY="your-gemini-key"
+export GRIDSYNC_LLM_MODEL="gemini-2.5-flash"
+export GRIDSYNC_LLM_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai"
 
 curl -s -X POST http://127.0.0.1:8000/assistant/query \
   -H "Content-Type: application/json" \
   -d '{"query":"Explain this opportunity.","utility_a":"Duke Energy Florida","utility_b":"Tampa Electric","opportunity_id":"DUKE-P0132__TECO-138005"}'
+
+curl -s -X POST http://127.0.0.1:8000/assistant/query \
+  -H "Content-Type: application/json" \
+  -d '{"query":"What can I filter on this dashboard?","messages":[{"role":"user","content":"Show me the strongest opportunities."},{"role":"assistant","content":"The top card is DUKE-P0132__TECO-138005."}]}'
 ```
 
-A provider failure also keeps `llm_used` false and returns the structured record. `15.05` miles on the top public pair is the minimum distance between known endpoints.
+A provider failure also keeps `llm_used` false and returns the structured record. The upstream status is logged locally with a short redacted message; the API key and `Authorization` header are not logged. `15.05` miles on the top public pair is the minimum distance between known endpoints.
 
 ## Not implemented
 
