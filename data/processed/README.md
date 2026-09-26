@@ -453,3 +453,62 @@ python tests/test_scoring.py
 python tests/test_confidence.py
 python tests/test_scored_opportunities_integrity.py
 ```
+
+---
+
+# Task 6 outputs
+
+## gridsync_opportunities.json
+
+The final backend-facing output: one Coordination Package per score-eligible
+pair (50), already in rank order. Task 5's file is read but never modified -
+`scripts/build_coordination_packages.py` verifies every package's score and
+rank match the source CSV exactly before writing anything.
+
+**The conservatism that matters here:** resource `"potential"` never comes
+from Coordination Score, distance, or schedule - `analysis/resource_rules.py`
+functions structurally cannot see any of those (tested directly via
+`inspect.signature`). It reads only project type and voltage, and requires
+**both** to agree before calling anything `HIGH`:
+
+```
+same project type + compatible voltage  -> HIGH
+one of those two alone                  -> MEDIUM
+neither                                 -> LOW
+```
+
+This is stricter than the base task brief asked for. Bare project-type
+matching (which the brief's own example would call HIGH on its own) is
+capped at MEDIUM here - two projects both being "transmission_upgrade" is
+real evidence, but it doesn't establish that a crane class matches, that
+either utility has spare equipment, or that mobilization is feasible. The
+real, empirical result: `DUKE-P0314__TECO-66653` scores a **perfect 100 on
+geography** but only **LOW** resource potential, because the project types
+and voltage genuinely differ - resource strength and Coordination Score are
+provably independent in this data, not just in theory.
+
+Taxonomy is 6 categories (`specialized_line_crews`, `heavy_equipment`,
+`material_logistics`, `outage_planning`, `construction_mobilization`,
+`electrical_crews`) - narrower than the brief's example list. Dropped:
+`cranes` (folded into `heavy_equipment` - naming specific equipment implies a
+concreteness public data can't back), `transformer_logistics`,
+`excavation_crews`, `trenching_equipment`, `traffic_control`,
+`specialized_engineering` - none supported by any project type actually in
+this dataset.
+
+Every resource evidence sentence is phrased as a category "associated with"
+the project types, never as something the two utilities "can share."
+
+`analyze_projects(utility_a, utility_b, min_score=None, top_n=None)` in
+`analysis/pipeline.py` is the one function a backend needs - no pandas,
+TF-IDF, or CSV knowledge required. Returns precomputed data (reads the JSON +
+Task 5's CSV, does not rerun the pipeline). An unrecognized utility pair
+returns an empty, valid result rather than raising.
+
+## Rebuilding Task 6
+
+```bash
+python scripts/build_coordination_packages.py
+python tests/test_resources.py
+python tests/test_pipeline.py
+```
