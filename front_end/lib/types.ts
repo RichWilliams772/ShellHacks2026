@@ -1,6 +1,8 @@
-// Mirrors the output of analyze_projects() in analysis/pipeline.py, field for field.
-// If the pipeline's output changes, update this file first.
-// Every number here is computed by the analysis pipeline; the frontend only displays it.
+// The frontend's own internal contract. Originally mirrored analyze_projects() in
+// analysis/pipeline.py field for field, but the real backend reshapes that data into its
+// own field names (see lib/api.ts's mapAnalyzeResponse()) — so this file now stays fixed and
+// the adapter absorbs whatever the backend calls things. Every number here is computed by
+// the analysis pipeline; the frontend only displays it.
 
 export type Confidence = "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN";
 export type Potential = "HIGH" | "MEDIUM" | "LOW";

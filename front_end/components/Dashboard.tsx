@@ -24,7 +24,8 @@ export default function Dashboard() {
     setStatus("loading");
     setSelectedId(null);
     try {
-      setData(await analyze({ utility_a: UTILITY_A, utility_b: UTILITY_B }));
+      const { data: result } = await analyze({ utility_a: UTILITY_A, utility_b: UTILITY_B });
+      setData(result);
       setFilters(DEFAULT_FILTERS);
       setStatus("ready");
     } catch (e) {
@@ -74,7 +75,12 @@ export default function Dashboard() {
   }, [opportunities]);
 
   // Opening or leaving a pair starts the side column at the top.
-  useEffect(() => sideRef.current?.scrollTo({ top: 0 }), [selectedId]);
+  // Block body on purpose: an implicit-return arrow here would make the effect's
+  // return value whatever scrollTo() hands back, and React treats any non-function,
+  // non-undefined return as an attempted cleanup function.
+  useEffect(() => {
+    sideRef.current?.scrollTo({ top: 0 });
+  }, [selectedId]);
 
   function selectByProject(projectId: string) {
     const best = filtered.find((o) => o.project_a.id === projectId || o.project_b.id === projectId);
