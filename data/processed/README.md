@@ -128,3 +128,38 @@ python scripts/normalize_duke_projects.py
 python scripts/build_candidate_pairs.py
 python tests/test_candidate_pairs.py
 ```
+
+## Two things the pair file deliberately does not do
+
+**It does not repeat provenance.** `project_source`, `geography_source`,
+`source_url`, `unresolved_reason`, `ownership_note` and `data_type` live in the
+two project files, not duplicated 160 times. For the "public sources" and "why
+unmatched" parts of the detail panel, join back on id:
+
+```python
+pairs = pd.read_csv("data/processed/duke_teco_candidate_pairs.csv")
+duke  = pd.read_csv("data/processed/duke_projects_normalized.csv")
+teco  = pd.read_csv("data/processed/teco_projects_geocoded.csv")
+
+detail = (pairs
+    .merge(duke.add_prefix("a_"), left_on="project_a_id", right_on="a_project_id")
+    .merge(teco.add_prefix("b_"), left_on="project_b_id", right_on="b_project_id"))
+```
+
+**It does not use the field names in the project spec's JSON examples.** These
+files use `project_id`, `project_start`, `project_cost`, `mid_lat` / `mid_lon`.
+The spec examples use `id`, `start_date`, `capital_cost`, `latitude` /
+`longitude`. A reader looking for the spec names finds nothing and renders an
+empty map with no error. The mapping is:
+
+| these files | project spec examples |
+|---|---|
+| `project_id` | `id` |
+| `project_start` | `start_date` |
+| `project_end` | `end_date` |
+| `project_cost` | `capital_cost` |
+| `mid_lat` / `mid_lon` | `latitude` / `longitude` |
+| `voltage_max_kv` | `voltage_kv` |
+
+Pick one set of names for the API response and say so — this is a contract,
+not something either side should guess at.

@@ -3,6 +3,7 @@
 
 import csv
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -21,7 +22,8 @@ SIDES = ("a", "b")
 # to compute distance, schedule overlap or similarity, and nothing computed.
 CARRIED = [
     "project_id", "utility", "project_name", "project_type", "status",
-    "voltage_min_kv", "voltage_max_kv", "project_start", "construction_start",
+    "voltage_min_kv", "voltage_max_kv", "voltage_label", "project_start",
+    "construction_start",
     "project_end", "date_precision", "estimated_in_service_year",
     "from_substation", "to_substation", "from_lat", "from_lon", "to_lat",
     "to_lon", "mid_lat", "mid_lon", "geometry_type", "location_method",
@@ -44,16 +46,34 @@ def clean(value):
     return value
 
 
+def voltage_range(label):
+    """'138/230 kV' -> (138, 230). A single value or unreadable text -> (None, None)."""
+    if not isinstance(label, str):
+        return (None, None)
+    numbers = [int(n) for n in re.findall(r"\d+", label)]
+    return (min(numbers), max(numbers)) if len(numbers) > 1 else (None, None)
+
+
 def load(path, label):
     frame = pd.read_csv(path, dtype={"circuit_id": "string"})
     if frame.empty:
         raise SystemExit(f"{label} dataset is empty: {path}")
 
-    # TECO carries a single voltage figure; Duke carries a min and a max. Fill
-    # the missing shape so both sides expose the same columns.
+    # TECO carries one voltage figure plus the label as filed; Duke carries a min
+    # and a max. Give both sides the same shape, reading the range out of the
+    # label so a "138/230 kV" project is not flattened to 230 alone.
     if "voltage_kv" in frame.columns and "voltage_min_kv" not in frame.columns:
-        frame["voltage_min_kv"] = frame["voltage_kv"]
-        frame["voltage_max_kv"] = frame["voltage_kv"]
+        ranges = frame.get("voltage_label", pd.Series(dtype=object)).map(voltage_range)
+        frame["voltage_min_kv"] = [
+            low if low is not None else clean(fallback)
+            for (low, _), fallback in zip(ranges.reindex(frame.index, fill_value=(None, None)),
+                                          frame["voltage_kv"])
+        ]
+        frame["voltage_max_kv"] = [
+            high if high is not None else clean(fallback)
+            for (_, high), fallback in zip(ranges.reindex(frame.index, fill_value=(None, None)),
+                                           frame["voltage_kv"])
+        ]
 
     missing = [column for column in CARRIED if column not in frame.columns]
     for column in missing:
