@@ -77,6 +77,30 @@ def main():
     present = [c for c in FORBIDDEN_LATER_TASK_COLUMNS if c in features.columns]
     check("no Task 4/5/6 columns were accidentally created", not present, str(present))
 
+    # Task 2 already decided which pairs have geography on both sides
+    # (geography_available_both). Task 3's own geography_available must agree -
+    # a mismatch would mean the two tasks disagree about the same 50 pairs.
+    agree = features["geography_available"] == candidates.set_index("pair_id") \
+        .loc[features["pair_id"], "geography_available_both"].values
+    check("geography_available agrees with Task 2's geography_available_both",
+          agree.all(), f"{(~agree).sum()} pairs disagree")
+
+    # A pandas NaN written by csv.DictWriter becomes the literal text "nan",
+    # which most non-pandas readers (JS, plain Python csv, a naive JSON step)
+    # will not treat as missing. No cell in the output should ever be that.
+    raw_text = FEATURES.read_text()
+    check("no cell in the output file is the literal text 'nan'",
+          ",nan," not in raw_text and not raw_text.startswith("nan,")
+          and ",nan\n" not in raw_text)
+
+    # Reason strings are meant for a human to read on stage. If a project has a
+    # named substation, use it - "Duke's origin" reads like a bug, not evidence.
+    named = features[features["geographic_score"].notna()
+                    & features["project_a_from_substation"].notna()]
+    check("geographic_reason names substations instead of saying 'origin'/'destination'",
+          not named["geographic_reason"].str.contains(r"'s origin\b|'s destination\b",
+                                                       regex=True).any())
+
     for field in ("project_a_project_source", "project_a_source_url"):
         if field in candidates.columns:
             check(f"{field} survived from earlier tasks", field in features.columns)

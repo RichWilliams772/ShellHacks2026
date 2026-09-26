@@ -242,3 +242,41 @@ python tests/test_geographic.py
 python tests/test_temporal.py
 python tests/test_pair_features_integrity.py
 ```
+
+## A warning for Task 5 (scoring)
+
+Do not `fillna(0)` on `geographic_score` or `temporal_score` when combining them.
+110 pairs have a null geographic score and 16 have a null temporal score - those
+are "unmeasured," and zero-filling them would make an unmeasured pair look like
+a known bad match, reviving exactly the ranking bug this pipeline was built to
+avoid.
+
+There is a second, sharper trap here: **do not let a stale project's clean
+geography accidentally win.** `DUKE-P0313` (Osprey-Haines City) has an
+in-service year of 2023 and is only 6 miles from a 2026 TECO project - that
+pair scores `geographic_score=100` but `temporal_score=20` (3 years apart). If
+Task 5's weighted blend (`0.4 * geo + 0.3 * temporal + ...`) runs on that pair
+versus a genuinely-2026 Duke project sitting 42-82 miles away
+(`geographic_score` 20-50, `temporal_score=80` for being in the same year), the
+2023 pair can out-score the honest 2026 one. A single blended number hides
+that one pair is "close but stale" and the other is "farther but current" -
+two very different stories that deserve to stay visible, not collapse into one
+score that a judge then has to be talked out of. Surface both components next
+to the blend, not just the blend.
+
+## Two intentional design choices, in case they look like bugs
+
+**`geographic_score` never factors in `pair_geography_confidence`.** A MEDIUM
+project (one endpoint located) that happens to sit 6 miles away still scores
+100 - the distance is real, only the confidence about the *other* endpoint is
+lower. Folding confidence into the score would violate PROJECT_SPEC's own rule
+("do not use confidence as a score"). Show both fields side by side instead of
+blending them.
+
+**Distance is `<= 10/25/50/100` with a hard cutoff at each boundary**, not a
+smooth curve - 50.0 miles scores 50, 50.01 scores 20. This is the exact
+worked example given for this rule; it is not something to soften without
+being asked. The same is true of the year-proximity buckets: the task
+deliberately specifies three tiers (same year / 1 year / 2+), so a project 3
+years off and one 6 years off score identically. That coarseness is the
+requested prototype, not an oversight.

@@ -115,12 +115,27 @@ def pair_geography_confidence(confidence_a, confidence_b):
     return "MEDIUM"
 
 
-def geographic_reason(distance_miles, nearest_a, nearest_b):
-    """A plain sentence a judge can read, generated only from calculated values."""
+def _endpoint_name(project, label):
+    """The substation behind a nearest-endpoint label, e.g. 'Osprey' not 'origin'."""
+    if label == "origin":
+        return project.get("from_substation")
+    if label == "destination":
+        return project.get("to_substation")
+    return None
+
+
+def geographic_reason(distance_miles, project_a, project_b, nearest_a, nearest_b):
+    """A plain sentence a judge can read: substation names, not 'origin'/'destination'.
+
+    Falls back to the endpoint label only if a project has no substation name on
+    record, which should not happen for any endpoint that produced a distance.
+    """
     if distance_miles is None:
         return "Insufficient location data to estimate distance between these projects."
+    name_a = _endpoint_name(project_a, nearest_a) or f"its {nearest_a}"
+    name_b = _endpoint_name(project_b, nearest_b) or f"its {nearest_b}"
     return (f"Known project endpoints are approximately {distance_miles:.1f} miles "
-            f"apart (Duke's {nearest_a}, TECO's {nearest_b}).")
+            f"apart (Duke's {name_a} and TECO's {name_b}).")
 
 
 def calculate_endpoint_proximity(project_a, project_b):
@@ -147,5 +162,6 @@ def calculate_endpoint_proximity(project_a, project_b):
         "pair_geography_confidence": pair_geography_confidence(
             project_a.get("location_confidence"), project_b.get("location_confidence")),
         "geographic_score": geographic_score(distance),
-        "geographic_reason": geographic_reason(distance, nearest_a, nearest_b),
+        "geographic_reason": geographic_reason(distance, project_a, project_b,
+                                               nearest_a, nearest_b),
     }

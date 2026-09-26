@@ -163,11 +163,13 @@ def calculate_temporal_features(project_a, project_b):
 
         overlap, months, gap = calculate_month_overlap(start_a, end_a, start_b, end_b)
         score = calculate_month_overlap_score(overlap, months, gap)
-        reason = (f"Construction schedules overlap for {months} calendar month"
-                  f"{'s' if months != 1 else ''}."
-                  if overlap else
-                  f"Construction schedules do not overlap; "
-                  f"the gap between them is about {gap} month{'s' if gap != 1 else ''}.")
+        if overlap:
+            reason = f"Construction schedules overlap for {months} calendar month{'s' if months != 1 else ''}."
+        elif gap == 0:
+            reason = "Construction schedules do not overlap, but the two periods are adjacent."
+        else:
+            reason = (f"Construction schedules do not overlap; the gap between them "
+                      f"is about {gap} month{'s' if gap != 1 else ''}.")
         return {
             "temporal_data_available": True,
             "temporal_precision": "month",
