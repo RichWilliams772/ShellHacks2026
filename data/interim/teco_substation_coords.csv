@@ -1,0 +1,12 @@
+substation_name,matched_name,hifld_id,county,latitude,longitude,max_voltage_kv,match_type,record_source,geography_source,retrieved_date
+Clearview,CLEARVIEW,151102,HILLSBOROUGH,27.954757651000023,-82.50206661099998,138,exact_name,"Florida Geographic Data Library, OpenStreetMap, https://www.tampaelectric.com/files/projects/clearview/projectareamap.pdf","HIFLD Electric Substations (national layer), queried via ArcGIS REST",2026-09-26
+Estuary,,,,,,,not_found,,,2026-09-26
+First Street,,,,,,,not_found,,,2026-09-26
+Gannon,GANNON,150485,HILLSBOROUGH,27.93806919700006,-82.44013826299994,69,exact_name,"IMAGERY, OpenStreetMap","HIFLD Electric Substations (national layer), queried via ArcGIS REST",2026-09-26
+Juneau,JUNEAU,151072,HILLSBOROUGH,28.02284274300007,-82.48101535599994,230,exact_name,"OpenStreetMap, https://www.tampaelectric.com/files/projects/juneauto11thst/projectareamap.pdf","HIFLD Electric Substations (national layer), queried via ArcGIS REST",2026-09-26
+Lake Agnes,LAKE AGNES,151543,POLK,28.15503006600005,-81.82700854499996,230,exact_name,"OpenStreetMap, https://www.tampaelectric.com/files/projects/lakeagnes/projectareamap.pdf","HIFLD Electric Substations (national layer), queried via ArcGIS REST",2026-09-26
+Ohio,OHIO,151103,HILLSBOROUGH,27.977163463000068,-82.49816320399998,138,exact_name,"Florida Geographic Data Library, OpenStreetMap","HIFLD Electric Substations (national layer), queried via ArcGIS REST",2026-09-26
+Sandhill,,,,,,,not_found,,,2026-09-26
+Skyway,SKYWAY,154549,HILLSBOROUGH,27.977115643000047,-82.55019121599997,69,exact_name,"Florida Geographic Data Library, OpenStreetMap","HIFLD Electric Substations (national layer), queried via ArcGIS REST",2026-09-26
+South Eloise,SOUTH ELOISE,153193,POLK,27.98724072400006,-81.74407045999999,230,exact_name,"OpenStreetMap, https://www.tampaelectric.com/files/projects/southeloise/projectareamap.pdf","HIFLD Electric Substations (national layer), queried via ArcGIS REST",2026-09-26
+Trout Creek,,,,,,,not_found,,,2026-09-26

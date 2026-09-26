@@ -1,0 +1,7 @@
+# Aaron Green
+# Python packages needed to run the GridSync data scripts.
+
+pandas
+openpyxl
+pdfplumber
+requests
