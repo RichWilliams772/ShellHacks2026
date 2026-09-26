@@ -4,21 +4,10 @@
 import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo } from "react";
 import L from "leaflet";
-import { MapContainer, TileLayer, Marker, Polyline, Popup, Tooltip, GeoJSON, useMap } from "react-leaflet";
-import type { LatLngExpression, LatLngBoundsExpression } from "leaflet";
+import { MapContainer, TileLayer, Marker, Polyline, Tooltip, useMap } from "react-leaflet";
 import type { Opportunity, Project } from "@/lib/types";
-import { MAP_CENTER, MAP_ZOOM } from "@/lib/config";
-import {
-  fmtKv,
-  fmtMiles,
-  fmtPeriod,
-  humanize,
-  precisionLabel,
-  shortUtility,
-  utilityColor,
-  utilityShape,
-  NA,
-} from "@/lib/format";
+import { MAP_CENTER, MAP_ZOOM, REDLINE } from "@/lib/config";
+import { fmtMiles, shortUtility, utilityColor, utilityShape } from "@/lib/format";
 
 interface Props {
   projects: Project[];
@@ -26,18 +15,54 @@ interface Props {
   onSelectProject?: (projectId: string) => void;
 }
 
-const hasPoint = (p: Project) => p.latitude != null && p.longitude != null;
-const isLine = (g: GeoJSON.Geometry | null) => g?.type === "LineString" || g?.type === "MultiLineString";
+type LL = [number, number];
 
-// HTML marker so each utility gets its own shape (circle / diamond / square), not just its own color.
+const point = (p: Project): LL | null => (p.mid_lat != null && p.mid_lon != null ? [p.mid_lat, p.mid_lon] : null);
+
+const corridor = (p: Project): LL[] | null =>
+  p.geometry_type === "approximate_corridor" && p.from_lat != null && p.from_lon != null && p.to_lat != null && p.to_lon != null
+    ? [
+        [p.from_lat, p.from_lon],
+        [p.to_lat, p.to_lon],
+      ]
+    : null;
+
+const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Where to draw the dimension line. The pipeline measures distance between the nearest known
+// endpoints, so the line connects those; this only picks drawing positions, it never changes the number.
+function dimensionEnds(a: Project, b: Project): [LL, LL] | null {
+  const ends = (p: Project) => corridor(p) ?? (point(p) ? [point(p)!] : []);
+  let best: [LL, LL] | null = null;
+  let bestD = Infinity;
+  for (const pa of ends(a))
+    for (const pb of ends(b)) {
+      const d = (pa[0] - pb[0]) ** 2 + ((pa[1] - pb[1]) * Math.cos((pa[0] * Math.PI) / 180)) ** 2;
+      if (d < bestD) [bestD, best] = [d, [pa, pb]];
+    }
+  return best;
+}
+
+// Short perpendicular ticks at each end, like a dimension on an engineering drawing.
+function ticks([p, q]: [LL, LL]): LL[][] {
+  const dy = q[0] - p[0];
+  const dx = q[1] - p[1];
+  const len = Math.hypot(dx, dy) || 1;
+  const s = Math.max(len * 0.035, 0.008);
+  const [ny, nx] = [(dx / len) * s, (-dy / len) * s];
+  return [p, q].map((e) => [
+    [e[0] + ny, e[1] + nx],
+    [e[0] - ny, e[1] - nx],
+  ]);
+}
+
 function markerIcon(p: Project, selected: boolean, dimmed: boolean) {
-  const size = selected ? 22 : 14;
-  const color = utilityColor(p.utility);
+  const size = selected ? 20 : 13;
   const shape = utilityShape(p.utility);
-  const radius = shape === "circle" ? "9999px" : "2px";
+  const radius = shape === "circle" ? "9999px" : "1px";
   const rotate = shape === "diamond" ? "rotate(45deg) scale(0.85)" : "none";
-  const border = selected ? "3px solid #0f172a" : "2px solid #ffffff";
-  const html = `<div style="width:${size}px;height:${size}px;background:${color};border:${border};border-radius:${radius};transform:${rotate};opacity:${dimmed ? 0.35 : 1};box-shadow:0 1px 3px rgba(0,0,0,.35)"></div>`;
+  const border = selected ? `3px solid ${REDLINE}` : "2px solid #f7f8f5";
+  const html = `<div style="width:${size}px;height:${size}px;background:${utilityColor(p.utility)};border:${border};border-radius:${radius};transform:${rotate};opacity:${dimmed ? 0.35 : 1}"></div>`;
   return L.divIcon({ html, className: "", iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
 }
 
@@ -45,8 +70,8 @@ function markerIcon(p: Project, selected: boolean, dimmed: boolean) {
 function FitToProjects({ projects }: { projects: Project[] }) {
   const map = useMap();
   useEffect(() => {
-    const pts = projects.filter(hasPoint).map((p): [number, number] => [p.latitude!, p.longitude!]);
-    if (pts.length > 0) map.fitBounds(pts, { padding: [40, 40], maxZoom: 10 });
+    const pts = projects.map(point).filter((x): x is LL => x !== null);
+    if (pts.length > 0) map.fitBounds(pts, { padding: [40, 40], maxZoom: 10, animate: !reducedMotion() });
   }, [projects, map]);
   return null;
 }
@@ -55,54 +80,19 @@ function FitToSelection({ selected }: { selected: Opportunity | null }) {
   const map = useMap();
   useEffect(() => {
     if (!selected) return;
-    const pts = [selected.project_a, selected.project_b].filter(hasPoint);
+    const pts = [selected.project_a, selected.project_b].flatMap((p) => corridor(p) ?? (point(p) ? [point(p)!] : []));
     if (pts.length === 0) return;
-    const bounds = pts.map((p) => [p.latitude!, p.longitude!]) as LatLngBoundsExpression;
-    map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 11, duration: 0.6 });
+    if (reducedMotion()) map.fitBounds(pts, { padding: [90, 90], maxZoom: 11, animate: false });
+    else map.flyToBounds(pts, { padding: [90, 90], maxZoom: 11, duration: 0.8 });
   }, [selected, map]);
   return null;
-}
-
-function ProjectPopup({ p }: { p: Project }) {
-  return (
-    <div className="min-w-[200px] text-xs leading-5">
-      <p className="text-sm font-semibold text-slate-900">{p.project_name}</p>
-      <p className="text-slate-600">{p.utility}</p>
-      <p className="mt-1">
-        <span className="text-slate-500">Type:</span> {humanize(p.project_type)}
-      </p>
-      <p>
-        <span className="text-slate-500">Voltage:</span> {fmtKv(p.voltage_kv)}
-      </p>
-      <p>
-        <span className="text-slate-500">Status:</span> {humanize(p.status)}
-      </p>
-      <p>
-        <span className="text-slate-500">Schedule:</span> {fmtPeriod(p.start_date, p.end_date)}
-      </p>
-      <p>
-        <span className="text-slate-500">Location confidence:</span> {p.location_confidence ?? NA}
-      </p>
-      {p.data_type === "demo" && <p className="mt-1 font-semibold text-amber-700">Demo record</p>}
-    </div>
-  );
 }
 
 export default function ProjectMap({ projects, selected, onSelectProject }: Props) {
   const selA = selected?.project_a.id;
   const selB = selected?.project_b.id;
   const isSel = (id: string) => id === selA || id === selB;
-  const dimOthers = selected != null;
-
-  const a = selected?.project_a;
-  const b = selected?.project_b;
-  const link: LatLngExpression[] | null =
-    a && b && hasPoint(a) && hasPoint(b)
-      ? [
-          [a.latitude!, a.longitude!],
-          [b.latitude!, b.longitude!],
-        ]
-      : null;
+  const dim = selected != null;
 
   // Draw selected projects last so they sit on top.
   const ordered = useMemo(
@@ -110,64 +100,64 @@ export default function ProjectMap({ projects, selected, onSelectProject }: Prop
     [projects, selA, selB],
   );
 
+  const dimension = selected ? dimensionEnds(selected.project_a, selected.project_b) : null;
+
   return (
-    <MapContainer center={MAP_CENTER} zoom={MAP_ZOOM} scrollWheelZoom className="h-full w-full">
+    <MapContainer center={MAP_CENTER} zoom={MAP_ZOOM} scrollWheelZoom={false} className="h-full w-full">
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <FitToProjects projects={projects} />
       <FitToSelection selected={selected} />
 
-      {/* Line geometry. Only "route" is drawn solid; approximate/endpoint geometry is dashed and labeled. */}
-      {ordered
-        .filter((p) => isLine(p.geometry))
-        .map((p) => {
-          const exact = p.geometry_precision === "route";
-          return (
-            <GeoJSON
-              key={`route-${p.id}-${isSel(p.id)}`}
-              data={p.geometry as GeoJSON.Geometry}
-              style={{
-                color: utilityColor(p.utility),
-                weight: isSel(p.id) ? 5 : 3,
-                opacity: dimOthers && !isSel(p.id) ? 0.25 : 0.8,
-                dashArray: exact ? undefined : "2 8",
-                lineCap: "round",
-              }}
-            >
-              <Tooltip sticky>
-                <span className="text-xs">
-                  {shortUtility(p.utility)} · {precisionLabel(p.geometry_precision)}
-                </span>
-              </Tooltip>
-            </GeoJSON>
-          );
-        })}
+      {/* Approximate corridors: a straight dashed line between endpoints, never presented as the route. */}
+      {ordered.map((p) => {
+        const line = corridor(p);
+        if (!line) return null;
+        const sel = isSel(p.id);
+        return (
+          <Polyline
+            key={`corridor-${p.id}-${sel}`}
+            positions={line}
+            pathOptions={{ color: utilityColor(p.utility), weight: sel ? 4 : 2.5, opacity: dim && !sel ? 0.25 : 0.9, dashArray: "6 6" }}
+          >
+            <Tooltip sticky>Approximate corridor, not the physical route</Tooltip>
+          </Polyline>
+        );
+      })}
 
-      {ordered.filter(hasPoint).map((p) => {
+      {ordered.map((p) => {
+        const pos = point(p);
+        if (!pos) return null;
         const sel = isSel(p.id);
         return (
           <Marker
             key={p.id}
-            position={[p.latitude!, p.longitude!]}
-            icon={markerIcon(p, sel, dimOthers && !sel)}
+            position={pos}
+            icon={markerIcon(p, sel, dim && !sel)}
             zIndexOffset={sel ? 1000 : 0}
             eventHandlers={{ click: () => onSelectProject?.(p.id) }}
           >
-            <Popup>
-              <ProjectPopup p={p} />
-            </Popup>
+            {/* Name only on hover; clicking opens the project's best pair in the side panel. */}
+            <Tooltip direction="top" offset={[0, -8]}>
+              {shortUtility(p.utility)}: {p.name}
+            </Tooltip>
           </Marker>
         );
       })}
 
-      {link && (
-        <Polyline positions={link} pathOptions={{ color: "#0f172a", weight: 2, dashArray: "6 6" }}>
-          <Tooltip permanent direction="center" className="!rounded-md !border-slate-900 !font-semibold">
-            {fmtMiles(selected!.features.distance_miles)} apart
-          </Tooltip>
-        </Polyline>
+      {selected && dimension && (
+        <>
+          <Polyline key={`dim-${selected.opportunity_id}`} positions={dimension} pathOptions={{ color: REDLINE, weight: 2.5 }}>
+            <Tooltip permanent direction="center" className="dimension-label">
+              {fmtMiles(selected.analysis.distance_miles)}
+            </Tooltip>
+          </Polyline>
+          {ticks(dimension).map((t, i) => (
+            <Polyline key={`tick-${selected.opportunity_id}-${i}`} positions={t} pathOptions={{ color: REDLINE, weight: 2.5 }} />
+          ))}
+        </>
       )}
     </MapContainer>
   );

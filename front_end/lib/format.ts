@@ -1,4 +1,5 @@
 import { UTILITY_COLORS, FALLBACK_COLORS } from "./config";
+import type { Analysis, Project } from "./types";
 
 // Null means "unknown", never zero (spec §7). Every formatter returns "Not available" for null.
 export const NA = "Not available";
@@ -7,46 +8,35 @@ export function fmtMiles(v: number | null | undefined) {
   return v == null ? NA : `${v.toFixed(1)} mi`;
 }
 
-export function fmtMonths(v: number | null | undefined) {
-  if (v == null) return NA;
-  if (v === 0) return "No overlap";
-  return `${v} month${v === 1 ? "" : "s"}`;
-}
-
-export function fmtPct(v: number | null | undefined) {
-  return v == null ? NA : `${Math.round(v * 100)}%`;
-}
-
-export function fmtKv(v: number | null | undefined) {
-  return v == null ? NA : `${v} kV`;
-}
-
-export function fmtMoney(v: number | null | undefined) {
-  if (v == null) return NA;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(v);
-}
-
-export function fmtInt(v: number | null | undefined) {
-  return v == null ? NA : v.toLocaleString("en-US");
-}
-
 export function fmtDate(v: string | null | undefined) {
   if (!v) return NA;
-  if (/^\d{4}$/.test(v)) return v; // year-only dates stay year-only
-  const iso = /^\d{4}-\d{2}$/.test(v) ? `${v}-01` : v; // "2026-06" -> Jun 2026
-  const d = new Date(`${iso.slice(0, 10)}T00:00:00`);
+  const d = new Date(`${v.slice(0, 10)}T00:00:00`);
   if (Number.isNaN(d.getTime())) return v;
   return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 }
 
-export function fmtPeriod(start: string | null, end: string | null) {
-  if (!start && !end) return NA;
-  return `${fmtDate(start)} – ${fmtDate(end)}`;
+// Month-precision projects show their dates; year-only projects say so rather than inventing a date.
+export function fmtSchedule(p: Project) {
+  if (p.start || p.end) return `${fmtDate(p.start)} – ${fmtDate(p.end)}`;
+  if (p.in_service_year != null) return `In service ${p.in_service_year} (year only)`;
+  return NA;
+}
+
+// Schedule relationship between the two projects, as reported by the temporal engine.
+export function fmtScheduleGap(a: Analysis) {
+  if (a.schedule_overlap_months != null)
+    return a.schedule_overlap_months > 0 ? `${a.schedule_overlap_months}-month overlap` : "No overlap";
+  if (a.same_active_year) return "Same active year";
+  if (a.year_difference != null) return `~${a.year_difference} yr apart`;
+  return NA;
+}
+
+// Years a project is active in, for the year filter.
+export function projectYears(p: Project): number[] {
+  const s = p.start ? Number(p.start.slice(0, 4)) : null;
+  const e = p.end ? Number(p.end.slice(0, 4)) : s;
+  if (s != null && e != null) return Array.from({ length: e - s + 1 }, (_, i) => s + i);
+  return p.in_service_year != null ? [p.in_service_year] : [];
 }
 
 // "transmission_upgrade" -> "Transmission upgrade"
@@ -71,16 +61,7 @@ export function utilityColor(name: string) {
   return assigned.get(name)!;
 }
 
-export function years(start: string | null, end: string | null): number[] {
-  const s = start ? Number(start.slice(0, 4)) : NaN;
-  const e = end ? Number(end.slice(0, 4)) : s;
-  if (Number.isNaN(s)) return [];
-  const out: number[] = [];
-  for (let y = s; y <= (Number.isNaN(e) ? s : e); y++) out.push(y);
-  return out;
-}
-
-// Second visual cue besides color (brief §6): Duke = circle, TECO = diamond.
+// Second visual cue besides color: Duke = circle, TECO = diamond.
 export type MarkerShape = "circle" | "diamond" | "square";
 export function utilityShape(name: string): MarkerShape {
   if (name === "Tampa Electric") return "diamond";
@@ -92,8 +73,8 @@ export const CONFIDENCE_HELP = "Confidence represents the quality of available g
 export const SCORE_HELP =
   "Composite indicator based on geographic proximity, schedule overlap, project similarity, and available infrastructure characteristics. A GridSync prototype measure, not an industry-standard utility metric.";
 
-export function precisionLabel(p: string | null | undefined) {
-  if (p === "route") return "Mapped route";
-  if (p === "endpoint_connection") return "Endpoint connection (not an exact route)";
-  return "Approximate project corridor (not an exact route)";
+export function geometryLabel(g: Project["geometry_type"]) {
+  if (g === "approximate_corridor") return "Approximate corridor (straight line between endpoints, not the route)";
+  if (g === "point") return "Single substation";
+  return NA;
 }

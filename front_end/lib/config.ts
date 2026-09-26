@@ -1,23 +1,22 @@
-// Frontend-only display settings. Scoring weights live in the backend config, never here.
+// Frontend-only display settings. Scoring weights live in the analysis pipeline, never here.
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-// true = use the bundled demo dataset instead of calling the backend.
+// true = use the bundled snapshot of real analysis output (lib/mock/analyze.json) instead of the backend.
 // Set NEXT_PUBLIC_USE_MOCK=false in .env.local once POST /analyze works.
 export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== "false";
 
-// Only used for the score badge color (green at or above this). It does not change any number.
-export const HIGH_OPPORTUNITY_SCORE = 75;
+// MVP compares exactly these two (spec §3).
+export const UTILITY_A = "Duke Energy Florida";
+export const UTILITY_B = "Tampa Electric";
 
-export const DEFAULT_UTILITY_A = "Duke Energy Florida";
-export const DEFAULT_UTILITY_B = "Tampa Electric";
-
-// Colors per utility on the map and in badges. Unknown utilities fall back to the last entry.
+// Map/legend colors per utility; keep in sync with --color-duke / --color-teco in globals.css.
 export const UTILITY_COLORS: Record<string, string> = {
-  "Duke Energy Florida": "#2563eb",
-  "Tampa Electric": "#ea580c",
+  "Duke Energy Florida": "#2456b8",
+  "Tampa Electric": "#e08a12",
 };
-export const FALLBACK_COLORS = ["#2563eb", "#ea580c", "#7c3aed", "#0d9488"];
+export const FALLBACK_COLORS = ["#2456b8", "#e08a12", "#5b6472"];
+export const REDLINE = "#c8352b";
 
-export const MAP_CENTER: [number, number] = [28.0, -82.4]; // Tampa Bay
-export const MAP_ZOOM = 8;
+export const MAP_CENTER: [number, number] = [28.6, -82.3]; // central Florida
+export const MAP_ZOOM = 7;

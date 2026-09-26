@@ -1,40 +1,38 @@
 # GridSync — frontend
 
-Next.js 16 + TypeScript + Tailwind + Leaflet dashboard for GridSync (see `shellhacks-2026-ideas/projectSpec.md`).
+Next.js 16 + TypeScript + Tailwind + Leaflet dashboard for GridSync (see `Specs/projectSpec.md`).
 
 ## Run
 ```bash
 npm install
-cp .env.example .env.local   # first time only
-npm run dev                  # http://localhost:3000
+npm run dev                  # http://localhost:3000, then click "Analyze projects"
 ```
 
-## Mock vs. live backend
-- `NEXT_PUBLIC_USE_MOCK=true` (default): uses `lib/mock/*.json`. These are **synthetic demo records**
-  (`data_type: "demo"`) and the header shows a "DEMO DATA" badge. Never present them as real utility data.
-- `NEXT_PUBLIC_USE_MOCK=false`: calls `POST {NEXT_PUBLIC_API_URL}/analyze`, `GET /utilities`, `GET /projects`.
-  Restart `npm run dev` after changing `.env.local`. The backend must allow CORS from `http://localhost:3000`.
+## Data: saved snapshot vs. live backend
+- **Default (`NEXT_PUBLIC_USE_MOCK` unset or `true`)**: uses `lib/mock/analyze.json`, a saved copy of
+  `analyze_projects("Duke Energy Florida", "Tampa Electric")` from `analysis/pipeline.py`. It is real public data,
+  not synthetic. Refresh it after the analysis pipeline changes (run from the repo root):
+  ```bash
+  python3 -c "import json; from analysis.pipeline import analyze_projects; json.dump(analyze_projects('Duke Energy Florida','Tampa Electric'), open('front_end/lib/mock/analyze.json','w'), indent=1)"
+  ```
+- **Live**: `cp .env.example .env.local`, set `NEXT_PUBLIC_USE_MOCK=false` and `NEXT_PUBLIC_API_URL`, restart `npm run dev`.
+  The frontend calls `POST {API_URL}/analyze` with `{"utility_a", "utility_b"}` and expects the `analyze_projects()`
+  output unchanged. The backend must allow CORS from `http://localhost:3000`.
 
 ## Where things live
 | File | What it does |
 |---|---|
-| `lib/types.ts` | Response shapes (spec §7, §24). Change here first if the API changes. |
-| `lib/api.ts` | All backend calls + mock switch. Converts the backend response into `lib/types.ts`. Accepts both the spec §24 shape (`features`, `coordination_package.resources`) and the brief's shape (`opportunity_id`, `analysis`, `shared_resources`, `name`, `construction_start`). Never computes scores. |
-| `lib/config.ts` | API URL, high-opportunity threshold, utility colors, map center. |
+| `lib/types.ts` | Mirrors `analyze_projects()` output field for field. Change here first if the pipeline output changes. |
+| `lib/api.ts` | Snapshot/live switch. No field mapping; never computes scores, distances, or resources. |
 | `lib/format.ts` | Display formatting. `null` shows "Not available", never 0. |
-| `components/Dashboard.tsx` | Page state: analyze, filters, selection. |
-| `components/ProjectMap.tsx` | Leaflet map (client-only), pair highlight + distance line. |
-| `components/OpportunityDetail.tsx` | Score, metrics, reasons, coordination package, sources. |
-
-## What the backend should send per project
-- `latitude` / `longitude` (needed for markers and the distance line)
-- `location_confidence`: `HIGH | MEDIUM | LOW | UNKNOWN`
-- `geometry` (GeoJSON line, optional) + `geometry_precision`: `route | approximate_corridor | endpoint_connection`.
-  Anything that isn't `route` is drawn dotted and labeled "not an exact route".
-- Optional score components (0–1): `distance_similarity`, `schedule_similarity`, `project_similarity`, `infrastructure_similarity`.
-  The "Score breakdown" bars only appear for components the backend sends.
+| `lib/config.ts` | API URL, the two MVP utilities, utility colors, map start view. |
+| `app/globals.css` | Design tokens ("planning sheet" palette) and Leaflet overrides. |
+| `components/Dashboard.tsx` | Page state: analyze, filters, selection. Side column shows the ranked list or one pair's details. |
+| `components/ProjectMap.tsx` | Leaflet map: projects, approximate corridors, red distance line for the selected pair. |
+| `components/OpportunityDetail.tsx` | Score, evidence, coordination package, score breakdown, project facts, sources. |
 
 ## Rules from the spec the UI follows
-- Distance, overlap, scores and shared resources come from the backend only; filters just hide rows.
+- Scores, distances, schedules, and shared resources come from the analysis only; filters just hide rows.
 - Missing values display as "Not available".
-- Every opportunity shows its reasons and public sources.
+- A line between two substations is labeled an approximate corridor, never the route.
+- Every opportunity shows its evidence and public sources.

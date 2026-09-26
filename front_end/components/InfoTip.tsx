@@ -5,9 +5,9 @@ export default function InfoTip({ text }: { text: string }) {
       tabIndex={0}
       title={text}
       aria-label={text}
-      className="ml-1 inline-grid h-4 w-4 cursor-help place-items-center rounded-full border border-slate-300 text-[10px] font-semibold text-slate-500 align-middle"
+      className="ml-1 inline-grid h-4 w-4 cursor-help place-items-center rounded-full border border-graphite align-middle text-[10px] font-semibold text-graphite"
     >
-      i
+      ?
     </span>
   );
 }

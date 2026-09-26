@@ -1,23 +1,47 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* "Planning sheet": drafting film, ink, and one redline for the selected pair. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: #edefea; /* drafting film */
+  --color-sheet: #f7f8f5; /* raised surfaces: title block, side column */
+  --color-ink: #1b2230;
+  --color-graphite: #5b6472;
+  --color-rule: #c9cec6; /* hairlines */
+  --color-duke: #2456b8;
+  --color-teco: #e08a12;
+  --color-redline: #c8352b; /* only the selected pair and its distance */
+  --font-sans: var(--font-barlow), system-ui, sans-serif;
+  --font-display: var(--font-barlow-condensed), var(--font-barlow), system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Keep Leaflet panes below the page's sticky/overlay UI */
-.leaflet-container { font: inherit; z-index: 0; }
-.leaflet-popup-content p { margin: 0; }
+:focus-visible {
+  outline: 2px solid var(--color-redline);
+  outline-offset: 2px;
+}
+
+/* Keep Leaflet panes below the page's overlay UI and in the page's type. */
+.leaflet-container { font: inherit; z-index: 0; background: var(--color-paper); }
+
+/* Grey the basemap so the utility colors and the redline carry the meaning. */
+.leaflet-tile-pane { filter: grayscale(1) contrast(0.85) brightness(1.08); }
+
+/* The distance label on the redline dimension. */
+.dimension-label.leaflet-tooltip {
+  background: var(--color-redline);
+  color: #fff;
+  border: 0;
+  border-radius: 2px;
+  box-shadow: none;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  padding: 1px 8px;
+}
+.dimension-label.leaflet-tooltip::before { display: none; }

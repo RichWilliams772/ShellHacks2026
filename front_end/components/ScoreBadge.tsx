@@ -1,18 +1,11 @@
-import { HIGH_OPPORTUNITY_SCORE } from "@/lib/config";
-
-// Displays the backend's score. Color bands are purely visual.
+// Displays the pipeline's Coordination Score as-is (rounded for display). No color bands:
+// there is no validated threshold for a "high" opportunity, so the number speaks for itself.
 export default function ScoreBadge({ score, size = "md" }: { score: number; size?: "md" | "lg" }) {
-  const tone =
-    score >= HIGH_OPPORTUNITY_SCORE
-      ? "bg-emerald-50 text-emerald-800 border-emerald-300"
-      : score >= 50
-        ? "bg-amber-50 text-amber-800 border-amber-300"
-        : "bg-slate-50 text-slate-700 border-slate-300";
-  const sz = size === "lg" ? "px-4 py-2 text-2xl" : "px-2.5 py-1 text-sm";
+  const sz = size === "lg" ? "text-5xl" : "text-2xl";
   return (
-    <span className={`inline-flex items-baseline gap-0.5 rounded-lg border font-semibold tabular-nums ${tone} ${sz}`}>
+    <span className={`font-display leading-none font-semibold ${sz}`}>
       {Math.round(score)}
-      <span className="text-[0.7em] font-medium opacity-70">/100</span>
+      <span className="text-[0.45em] font-medium text-graphite">/100</span>
     </span>
   );
 }

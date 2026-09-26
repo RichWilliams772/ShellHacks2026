@@ -1,81 +1,66 @@
 "use client";
 
-import type { Opportunity } from "@/lib/types";
-import { fmtMiles, fmtMonths, shortUtility, utilityColor, utilityShape } from "@/lib/format";
+import type { Opportunity, Project } from "@/lib/types";
+import { fmtMiles, fmtScheduleGap, NA, utilityColor, utilityShape } from "@/lib/format";
 import UtilityMarker from "./UtilityMarker";
 import ScoreBadge from "./ScoreBadge";
 
 interface Props {
   opportunities: Opportunity[];
-  rankOf: Map<string, number>;
-  selectedId: string | null;
   onSelect: (id: string) => void;
   total: number; // before filters, to tell "none found" apart from "all filtered out"
   onResetFilters: () => void;
 }
 
-function ProjectLine({ utility, name }: { utility: string; name: string }) {
+function ProjectLine({ p }: { p: Project }) {
   return (
-    <p className="flex items-center gap-2 truncate text-sm text-slate-900">
-      <UtilityMarker shape={utilityShape(utility)} color={utilityColor(utility)} />
-      <span className="shrink-0 font-semibold">{shortUtility(utility)}</span>
-      <span className="truncate">{name}</span>
+    <p className="flex min-w-0 items-baseline gap-2">
+      <UtilityMarker shape={utilityShape(p.utility)} color={utilityColor(p.utility)} />
+      <span className="min-w-0 break-words">{p.name}</span>
     </p>
   );
 }
 
-export default function OpportunityList({ opportunities, rankOf, selectedId, onSelect, total, onResetFilters }: Props) {
+export default function OpportunityList({ opportunities, onSelect, total, onResetFilters }: Props) {
   if (opportunities.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+      <p className="px-4 py-6 text-graphite">
         {total === 0 ? (
-          "The analysis found no coordination opportunities between these utilities."
+          "No project pairs had enough data to score."
         ) : (
           <>
-            All {total} opportunities are hidden by the current filters.{" "}
-            <button type="button" onClick={onResetFilters} className="font-semibold text-slate-900 underline">
-              Reset filters
+            The filters hide all {total} pairs.{" "}
+            <button type="button" onClick={onResetFilters} className="font-semibold text-ink underline">
+              Clear filters
             </button>
           </>
         )}
-      </div>
+      </p>
     );
   }
 
   return (
-    <ol className="flex flex-col gap-2">
+    <ol>
       {opportunities.map((o) => {
-        const active = o.id === selectedId;
-        const overlap = o.features.schedule_overlap_months;
+        const a = o.analysis;
+        const gap = fmtScheduleGap(a);
         return (
-          <li key={o.id}>
+          <li key={o.opportunity_id} className="border-b border-rule">
             <button
               type="button"
-              onClick={() => onSelect(o.id)}
-              aria-pressed={active}
-              className={`w-full rounded-xl border p-3 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 ${
-                active
-                  ? "border-slate-900 bg-slate-50 ring-1 ring-slate-900"
-                  : "border-slate-200 bg-white hover:border-slate-400"
-              }`}
+              onClick={() => onSelect(o.opportunity_id)}
+              className="grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-3 text-left hover:bg-sheet"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1 space-y-1">
-                  <p className="text-xs font-semibold text-slate-400">#{rankOf.get(o.id)}</p>
-                  <ProjectLine utility={o.project_a.utility} name={o.project_a.project_name} />
-                  <p className="pl-4 text-xs text-slate-400">↕</p>
-                  <ProjectLine utility={o.project_b.utility} name={o.project_b.project_name} />
-                </div>
-                <ScoreBadge score={o.coordination_score} />
-              </div>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-                <span>
-                  {o.features.distance_miles == null ? "Distance: not available" : `${fmtMiles(o.features.distance_miles)} apart`}
+              <span className="font-display text-lg leading-6 font-semibold text-graphite">{a.opportunity_rank}</span>
+              <span className="min-w-0 space-y-0.5">
+                <ProjectLine p={o.project_a} />
+                <ProjectLine p={o.project_b} />
+                <span className="block pt-1 text-sm text-graphite">
+                  {a.distance_miles == null ? "Distance not available" : `${fmtMiles(a.distance_miles)} apart`}
+                  {gap !== NA && `, ${gap.toLowerCase()}`}
                 </span>
-                <span>
-                  {overlap == null ? "Schedule: not available" : overlap === 0 ? "No schedule overlap" : `${fmtMonths(overlap)} schedule overlap`}
-                </span>
-              </div>
+              </span>
+              <ScoreBadge score={a.coordination_score} />
             </button>
           </li>
         );
