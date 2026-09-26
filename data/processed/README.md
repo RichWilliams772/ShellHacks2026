@@ -280,3 +280,127 @@ being asked. The same is true of the year-proximity buckets: the task
 deliberately specifies three tiers (same year / 1 year / 2+), so a project 3
 years off and one 6 years off score identically. That coarseness is the
 requested prototype, not an oversight.
+
+---
+
+# Task 4 outputs
+
+## duke_teco_pair_similarity.csv
+
+Task 3's file with text and infrastructure similarity appended. Same 160 rows,
+every Task 3 column unchanged - only new columns added. Built by
+`scripts/build_similarity_features.py` from `analysis/similarity.py` (TF-IDF
+text) and `analysis/infrastructure.py` (structured attributes).
+
+### Text similarity
+
+TF-IDF is fit **once** across all 26 unique projects (10 Duke + 16 TECO), then
+cosine similarity is looked up per pair - never refit per pair, which would
+put every pair in its own incomparable vocabulary.
+
+Text = `project_name` + normalized `project_type` (e.g. "transmission
+upgrade"), lowercased, utility branding stripped, **bare voltage figures
+stripped** (`"230 kV"`, `"69kV"`, `"138/230 kV"` all removed as tokens -
+voltage is already its own component below; leaving these in was originally
+tried and rejected once real data showed it double-counting - see below).
+Excludes anything geographic/temporal/cost/ID - those are Task 3's territory,
+not "what is this project."
+
+`ngram_range=(1,1)` - tested against `(1,2)` on the real corpus first;
+bigrams made same-type vs different-type separation *worse* on 26 documents
+(median 0.097 vs 0.165), so unigrams were kept, not defaulted to.
+
+| column | meaning |
+|---|---|
+| `text_similarity_available` | was there enough text on both sides |
+| `text_similarity_raw` | cosine similarity, 0.0-1.0 |
+| `text_similarity_score` | `raw * 100` |
+| `shared_text_terms` | the actual overlapping words that drove the score |
+
+Coverage: 160/160 (every project has at least a name). Range: 0.00-31.60.
+
+**Fixed after a code review caught it:** the first version left voltage digits
+in project names, reasoning the effect was minor. It wasn't. `DUKE-P0313`
+("...230 kV Line") vs `TECO-230037` ("...138/230 kV...") shared only 3 text
+terms, and 2 of them - `"230"` and `"kv"` - were the voltage figure, not word
+choice; `voltage_similarity` was separately scoring that same 230kV match as
+100. `normalize_text` now strips any number directly adjacent to "kv" before
+vectorizing (`analysis.similarity.VOLTAGE_TOKEN`), confirmed against the real
+data: zero pairs now have a bare voltage number in `shared_text_terms`.
+
+**The remaining limitation, by design:** TECO's 11 transmission-upgrade names
+are near-identical templates ("Transmission Upgrades-69 kV-66833"), so raw
+text similarity alone underrates genuinely similar projects when Duke's name
+is long and place-heavy. Concrete example in this data: `DUKE-P0062`
+(Brooksville West, Mondon Hill, Bushnell East) vs `TECO-230037` scores only
+11.23 on text, despite being the *same project type with overlapping
+voltage* - `infrastructure_similarity` for that same pair is 100. That gap is
+not a bug - it's exactly why infrastructure similarity is a **separate,
+independent column** and not folded into the text score. Read both, always.
+
+**Missing text is never a Python falsy check.** `build_project_text` and
+`build_corpus` use `is_missing()`, not `if value:` - `float('nan')` is truthy
+in Python, so a naive check would have written the literal text `"nan nan"`
+into the corpus for any project missing both a name and a type, silently
+reporting `text_similarity_available=True` on garbage. Doesn't occur on this
+dataset (every one of the 26 projects has both fields), but a second utility
+or a partially-filled record could have hit it without this guard.
+
+**An all-missing or stop-word-only corpus degrades instead of crashing.**
+`fit_tfidf` catches scikit-learn's "empty vocabulary" `ValueError` and returns
+an empty lookup, so every pair correctly reports `text_similarity_available =
+False` instead of the whole Task 4 script stopping mid-run.
+
+### Infrastructure similarity
+
+| column | meaning |
+|---|---|
+| `project_type_similarity` | 100 = same normalized type, 0 = different, `null` = either missing/unknown |
+| `voltage_similarity` | 100 = overlapping range/class, lower = further apart, `null` = voltage unknown on either side |
+| `infrastructure_similarity` | weighted average of the two above, reweighted when one is missing |
+| `infrastructure_similarity_available` | was any structured comparison possible at all |
+
+Weights: project type 50%, voltage 35% (TASK_4's own recommended prototype
+starting point; PROJECT_SPEC defines no numeric weights for this component).
+**`line_type` and `AC/DC` are not in this file at all** - checked directly
+against the raw Our Grid Future workbook: both columns are blank for every one
+of the 10 Duke projects used, and TECO's schema never had them. Rather than
+ship an always-null column pretending to compare something never measured,
+they're left out entirely. If a source ever populates them, add a function to
+`analysis/infrastructure.py` the same way `project_type`/`voltage` are done.
+
+Voltage rule (gap in kV between the two projects' nominal ranges; overlapping
+ranges always score 100 regardless of gap size):
+
+```
+overlap -> 100      gap <= 75 kV -> 70      gap <= 150 kV -> 40      gap > 150 kV -> 15
+```
+
+Coverage: 160/160 have `project_type_similarity` (always populated).
+110/160 have `voltage_similarity` - the other 50 are Duke x TECO-substation
+-hardening pairs, where TECO's substation projects carry no voltage figure at
+all (real gap, not a bug: substation hardening work isn't filed with a
+voltage class the way circuit upgrades are).
+
+### similarity_confidence
+
+Describes **evidence available**, not similarity strength. A pair can be
+`HIGH` confidence and near-zero similarity - that means "confidently
+dissimilar," not "we don't know."
+
+```
+text + type + voltage all available -> HIGH   (110 pairs)
+text + type only (voltage missing)   -> MEDIUM (50 pairs)
+```
+
+LOW/UNKNOWN never occur in this dataset (every project has a name and a
+type), but the function handles them generally - see `tests/test_infrastructure.py`.
+
+## Rebuilding Task 4
+
+```bash
+python scripts/build_similarity_features.py
+python tests/test_similarity.py
+python tests/test_infrastructure.py
+python tests/test_pair_similarity_integrity.py
+```
