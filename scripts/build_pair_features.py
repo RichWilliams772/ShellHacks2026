@@ -2,6 +2,7 @@
 # Adds geographic and temporal features to every Duke x TECO pair from Task 2.
 
 import csv
+import math
 import sys
 from pathlib import Path
 
@@ -29,10 +30,27 @@ TEMPORAL_FIELDS = [
 ]
 
 
+def clean(value):
+    """pandas NaN must become None before it touches anything else.
+
+    Left as a float, csv.DictWriter writes it as the literal text "nan" -
+    correct to no reader that doesn't happen to be pandas. Task 2's own writer
+    already does this; this script has to do it too, on the same row it's
+    passing straight through from Task 2's file.
+    """
+    if value is None:
+        return None
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    return value
+
+
 def project_a_view(row):
     return {
         "from_lat": row["project_a_from_lat"], "from_lon": row["project_a_from_lon"],
         "to_lat": row["project_a_to_lat"], "to_lon": row["project_a_to_lon"],
+        "from_substation": row["project_a_from_substation"],
+        "to_substation": row["project_a_to_substation"],
         "location_confidence": row["project_a_location_confidence"],
         "start": row["project_a_start"], "end": row["project_a_end"],
         "in_service_year": row["project_a_in_service_year"],
@@ -44,6 +62,8 @@ def project_b_view(row):
     return {
         "from_lat": row["project_b_from_lat"], "from_lon": row["project_b_from_lon"],
         "to_lat": row["project_b_to_lat"], "to_lon": row["project_b_to_lon"],
+        "from_substation": row["project_b_from_substation"],
+        "to_substation": row["project_b_to_substation"],
         "location_confidence": row["project_b_location_confidence"],
         "start": row["project_b_start"], "end": row["project_b_end"],
         "in_service_year": row["project_b_in_service_year"],
@@ -53,7 +73,8 @@ def project_b_view(row):
 
 def build_features(pairs):
     rows = []
-    for row in pairs.to_dict("records"):
+    for raw_row in pairs.to_dict("records"):
+        row = {key: clean(value) for key, value in raw_row.items()}
         project_a, project_b = project_a_view(row), project_b_view(row)
         features = {**row,
                    **calculate_endpoint_proximity(project_a, project_b),
