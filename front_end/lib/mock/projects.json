@@ -1,0 +1,322 @@
+[
+  {
+    "id": "DEMO-DUKE-001",
+    "utility": "Duke Energy Florida",
+    "project_name": "Pasco 230 kV Line Reconductor",
+    "project_type": "transmission_upgrade",
+    "description": "Reconductor existing 230 kV transmission corridor in central Pasco County.",
+    "voltage_kv": 230,
+    "latitude": 28.28,
+    "longitude": -82.4,
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [
+          -82.52,
+          28.3
+        ],
+        [
+          -82.46,
+          28.29
+        ],
+        [
+          -82.4,
+          28.28
+        ],
+        [
+          -82.33,
+          28.26
+        ]
+      ]
+    },
+    "geometry_precision": "approximate_corridor",
+    "location_confidence": "HIGH",
+    "start_date": "2027-01-01",
+    "end_date": "2028-03-31",
+    "status": "planned",
+    "capital_cost": 42000000,
+    "customers_impacted": null,
+    "source_name": "GridSync demo dataset (synthetic \u2014 not a real utility record)",
+    "source_url": "",
+    "data_type": "demo"
+  },
+  {
+    "id": "DEMO-DUKE-002",
+    "utility": "Duke Energy Florida",
+    "project_name": "Largo Substation Expansion",
+    "project_type": "substation_upgrade",
+    "description": "Add transformer bay and upgrade switchgear at distribution substation.",
+    "voltage_kv": 115,
+    "latitude": 27.91,
+    "longitude": -82.79,
+    "geometry": null,
+    "geometry_precision": null,
+    "location_confidence": "HIGH",
+    "start_date": "2027-06-01",
+    "end_date": "2028-06-30",
+    "status": "planned",
+    "capital_cost": null,
+    "customers_impacted": 18000,
+    "source_name": "GridSync demo dataset (synthetic \u2014 not a real utility record)",
+    "source_url": "",
+    "data_type": "demo"
+  },
+  {
+    "id": "DEMO-DUKE-003",
+    "utility": "Duke Energy Florida",
+    "project_name": "Brooksville\u2013Spring Hill 115 kV Hardening",
+    "project_type": "transmission_upgrade",
+    "description": "Replace wood poles with steel along 115 kV line.",
+    "voltage_kv": 115,
+    "latitude": 28.5,
+    "longitude": -82.45,
+    "geometry": null,
+    "geometry_precision": null,
+    "location_confidence": "MEDIUM",
+    "start_date": "2028-01-01",
+    "end_date": "2029-06-30",
+    "status": "planned",
+    "capital_cost": null,
+    "customers_impacted": null,
+    "source_name": "GridSync demo dataset (synthetic \u2014 not a real utility record)",
+    "source_url": "",
+    "data_type": "demo"
+  },
+  {
+    "id": "DEMO-DUKE-004",
+    "utility": "Duke Energy Florida",
+    "project_name": "Clearwater Feeder Undergrounding",
+    "project_type": "undergrounding",
+    "description": "Convert overhead lateral feeders to underground.",
+    "voltage_kv": null,
+    "latitude": 27.97,
+    "longitude": -82.76,
+    "geometry": null,
+    "geometry_precision": null,
+    "location_confidence": "HIGH",
+    "start_date": "2027-03-01",
+    "end_date": "2027-12-31",
+    "status": "planned",
+    "capital_cost": null,
+    "customers_impacted": 6500,
+    "source_name": "GridSync demo dataset (synthetic \u2014 not a real utility record)",
+    "source_url": "",
+    "data_type": "demo"
+  },
+  {
+    "id": "DEMO-DUKE-005",
+    "utility": "Duke Energy Florida",
+    "project_name": "Zephyrhills 230 kV Tie Line",
+    "project_type": "new_transmission_line",
+    "description": "New 230 kV tie line to support load growth.",
+    "voltage_kv": 230,
+    "latitude": 28.23,
+    "longitude": -82.18,
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [
+          -82.3,
+          28.24
+        ],
+        [
+          -82.18,
+          28.23
+        ],
+        [
+          -82.1,
+          28.2
+        ]
+      ]
+    },
+    "geometry_precision": "approximate_corridor",
+    "location_confidence": "HIGH",
+    "start_date": "2028-07-01",
+    "end_date": "2030-06-30",
+    "status": "proposed",
+    "capital_cost": 95000000,
+    "customers_impacted": null,
+    "source_name": "GridSync demo dataset (synthetic \u2014 not a real utility record)",
+    "source_url": "",
+    "data_type": "demo"
+  },
+  {
+    "id": "DEMO-DUKE-006",
+    "utility": "Duke Energy Florida",
+    "project_name": "Lake Wales Substation Rebuild",
+    "project_type": "substation_upgrade",
+    "description": null,
+    "voltage_kv": 69,
+    "latitude": 27.9,
+    "longitude": -81.59,
+    "geometry": null,
+    "geometry_precision": null,
+    "location_confidence": "LOW",
+    "start_date": "2029-01-01",
+    "end_date": "2030-03-31",
+    "status": "planned",
+    "capital_cost": null,
+    "customers_impacted": null,
+    "source_name": "GridSync demo dataset (synthetic \u2014 not a real utility record)",
+    "source_url": "",
+    "data_type": "demo"
+  },
+  {
+    "id": "DEMO-TECO-001",
+    "utility": "Tampa Electric",
+    "project_name": "Northdale 230 kV Conductor Replacement",
+    "project_type": "transmission_upgrade",
+    "description": "Replace conductors along existing 230 kV transmission line.",
+    "voltage_kv": 230,
+    "latitude": 28.1,
+    "longitude": -82.47,
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [
+          -82.55,
+          28.12
+        ],
+        [
+          -82.47,
+          28.1
+        ],
+        [
+          -82.4,
+          28.07
+        ]
+      ]
+    },
+    "geometry_precision": "approximate_corridor",
+    "location_confidence": "HIGH",
+    "start_date": "2027-05-01",
+    "end_date": "2028-12-31",
+    "status": "planned",
+    "capital_cost": 37000000,
+    "customers_impacted": null,
+    "source_name": "GridSync demo dataset (synthetic \u2014 not a real utility record)",
+    "source_url": "",
+    "data_type": "demo"
+  },
+  {
+    "id": "DEMO-TECO-002",
+    "utility": "Tampa Electric",
+    "project_name": "Oldsmar Substation Upgrade",
+    "project_type": "substation_upgrade",
+    "description": "Transformer replacement and protection upgrades.",
+    "voltage_kv": 115,
+    "latitude": 28.04,
+    "longitude": -82.66,
+    "geometry": null,
+    "geometry_precision": null,
+    "location_confidence": "HIGH",
+    "start_date": "2027-09-01",
+    "end_date": "2028-09-30",
+    "status": "planned",
+    "capital_cost": null,
+    "customers_impacted": 12000,
+    "source_name": "GridSync demo dataset (synthetic \u2014 not a real utility record)",
+    "source_url": "",
+    "data_type": "demo"
+  },
+  {
+    "id": "DEMO-TECO-003",
+    "utility": "Tampa Electric",
+    "project_name": "Wesley Chapel 230 kV Expansion",
+    "project_type": "new_transmission_line",
+    "description": "New 230 kV circuit serving Wesley Chapel growth corridor.",
+    "voltage_kv": 230,
+    "latitude": 28.19,
+    "longitude": -82.33,
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [
+          -82.4,
+          28.16
+        ],
+        [
+          -82.33,
+          28.19
+        ],
+        [
+          -82.26,
+          28.22
+        ]
+      ]
+    },
+    "geometry_precision": "approximate_corridor",
+    "location_confidence": "HIGH",
+    "start_date": "2028-01-01",
+    "end_date": "2030-01-31",
+    "status": "proposed",
+    "capital_cost": null,
+    "customers_impacted": null,
+    "source_name": "GridSync demo dataset (synthetic \u2014 not a real utility record)",
+    "source_url": "",
+    "data_type": "demo"
+  },
+  {
+    "id": "DEMO-TECO-004",
+    "utility": "Tampa Electric",
+    "project_name": "Westchase Feeder Undergrounding",
+    "project_type": "undergrounding",
+    "description": "Underground overhead feeders in residential neighborhoods.",
+    "voltage_kv": null,
+    "latitude": 28.06,
+    "longitude": -82.61,
+    "geometry": null,
+    "geometry_precision": null,
+    "location_confidence": "HIGH",
+    "start_date": "2027-01-01",
+    "end_date": "2028-02-28",
+    "status": "planned",
+    "capital_cost": null,
+    "customers_impacted": null,
+    "source_name": "GridSync demo dataset (synthetic \u2014 not a real utility record)",
+    "source_url": "",
+    "data_type": "demo"
+  },
+  {
+    "id": "DEMO-TECO-005",
+    "utility": "Tampa Electric",
+    "project_name": "Plant City 69 kV Hardening",
+    "project_type": "transmission_upgrade",
+    "description": null,
+    "voltage_kv": 69,
+    "latitude": 28.02,
+    "longitude": -82.12,
+    "geometry": null,
+    "geometry_precision": null,
+    "location_confidence": "MEDIUM",
+    "start_date": "2029-03-01",
+    "end_date": "2030-06-30",
+    "status": "planned",
+    "capital_cost": null,
+    "customers_impacted": null,
+    "source_name": "GridSync demo dataset (synthetic \u2014 not a real utility record)",
+    "source_url": "",
+    "data_type": "demo"
+  },
+  {
+    "id": "DEMO-TECO-006",
+    "utility": "Tampa Electric",
+    "project_name": "Apollo Beach Substation",
+    "project_type": "substation_upgrade",
+    "description": "New distribution substation.",
+    "voltage_kv": null,
+    "latitude": 27.77,
+    "longitude": -82.4,
+    "geometry": null,
+    "geometry_precision": null,
+    "location_confidence": "UNKNOWN",
+    "start_date": null,
+    "end_date": null,
+    "status": "proposed",
+    "capital_cost": null,
+    "customers_impacted": null,
+    "source_name": "GridSync demo dataset (synthetic \u2014 not a real utility record)",
+    "source_url": "",
+    "data_type": "demo"
+  }
+]
