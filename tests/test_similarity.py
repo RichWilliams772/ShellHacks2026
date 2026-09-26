@@ -2,6 +2,7 @@
 # Checks the TF-IDF text-similarity logic in analysis/similarity.py.
 
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -10,7 +11,7 @@ sys.path.insert(0, str(ROOT))
 
 from analysis.similarity import (  # noqa: E402
     build_corpus, build_project_text, calculate_project_similarity,
-    calculate_text_similarity, fit_tfidf, normalize_text, shared_terms,
+    calculate_text_similarity, fit_tfidf, is_missing, normalize_text, shared_terms,
 )
 
 failures = []
@@ -145,6 +146,63 @@ def test_utility_branding_removed():
           "transmission" in text and "upgrade" in text, text)
 
 
+def test_pandas_nan_is_treated_as_missing():
+    """Regression: float('nan') is truthy in Python and must not sail through
+    a plain `if value:` check as if it were real text.
+    """
+    nan = float("nan")
+    check("is_missing recognizes float NaN", is_missing(nan))
+    check("build_project_text(nan, nan) is None, not the string 'nan nan'",
+          build_project_text(nan, nan) is None)
+    check("a NaN name with a real type still gives clean text, not 'nan ...'",
+          build_project_text(nan, "transmission_upgrade") == "transmission upgrade")
+    check("is_missing does not misclassify a real string", not is_missing("Osprey"))
+    check("is_missing treats a blank string as missing", is_missing("   "))
+
+
+def test_voltage_tokens_stripped_from_text():
+    """Regression: 'DUKE-P0313 vs TECO-230037' shared only 3 text terms, and
+    2 of them ('230', 'kv') were the voltage figure already scored separately
+    by voltage_similarity - not word choice. Voltage numbers next to 'kv'
+    must not leak into the text corpus.
+    """
+    text = normalize_text("Osprey to Kathleen 230 kV Line")
+    check("a bare voltage figure ('230 kv') is removed from text",
+          "230" not in text.split() and "kv" not in text.split(), text)
+    check("the real words in the name survive", "osprey" in text and "line" in text, text)
+
+    text = normalize_text("Transmission Upgrades-138/230 kV-230037")
+    # Check as whole tokens: "230037" (the circuit number) legitimately
+    # contains the substring "230", so this must not use plain `in text`.
+    tokens = re.findall(r"\w+", text)
+    check("a slash-separated dual voltage ('138/230 kv') is removed as tokens",
+          "138" not in tokens and "kv" not in tokens, tokens)
+    check("the circuit number (not a voltage figure) is left alone",
+          "230037" in tokens, tokens)
+
+
+def test_empty_corpus_does_not_crash():
+    """Regression: an all-missing or stop-word-only corpus used to raise
+    ValueError: empty vocabulary and take down the whole pipeline.
+    """
+    vectorizer, matrix, id_to_row = fit_tfidf({})
+    check("an empty corpus returns an empty id_to_row instead of raising",
+          id_to_row == {})
+    similarity = calculate_text_similarity("A", "B", matrix, id_to_row)
+    check("similarity against an empty corpus is null, not a crash",
+          similarity is None)
+
+
+def test_stopword_only_corpus_does_not_crash():
+    corpus = {"A": "the the the", "B": "the the the"}
+    vectorizer, matrix, id_to_row = fit_tfidf(corpus)
+    check("a stop-word-only corpus degrades to empty instead of raising",
+          id_to_row == {})
+    similarity = calculate_text_similarity("A", "B", matrix, id_to_row)
+    check("similarity in a stop-word-only corpus is null, not a crash",
+          similarity is None)
+
+
 def test_shared_terms_come_from_real_overlap():
     corpus = {"A": "transmission upgrade reliability", "B": "transmission upgrade project",
              "C": "substation hardening storm"}
@@ -167,6 +225,10 @@ def main():
     test_score_conversion()
     test_zero_similarity_is_valid_and_distinct_from_null()
     test_utility_branding_removed()
+    test_pandas_nan_is_treated_as_missing()
+    test_voltage_tokens_stripped_from_text()
+    test_empty_corpus_does_not_crash()
+    test_stopword_only_corpus_does_not_crash()
     test_shared_terms_come_from_real_overlap()
 
     print()

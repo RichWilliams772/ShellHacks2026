@@ -1,6 +1,7 @@
 # Aaron Green
 # Measures how similar a Duke project and a TECO project sound, using their own words only.
 
+import math
 import re
 
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -26,9 +27,34 @@ UTILITY_BRANDING_TERMS = [
 ]
 
 
+# A bare number immediately next to "kv" (any of "230 kV", "69kV", "138/230
+# kV") is a voltage figure, not a description of the work. voltage_similarity
+# is already a separate structured component - leaving these in project_name
+# double-counts voltage inside the text score. Confirmed on the real data:
+# DUKE-P0313 vs TECO-230037 shares only 3 terms, and "230"/"kv" are 2 of the
+# 3 - voltage tokens, not word choice, were driving most of that score.
+VOLTAGE_TOKEN = re.compile(r"\b\d{2,3}(?:/\d{2,3})?\s*kv\b")
+
+
+def is_missing(value):
+    """True for None, empty/blank strings, and pandas' float NaN.
+
+    Plain `if value:` is not safe here - NaN is truthy in Python, so a missing
+    pandas cell would otherwise sail through as if it were real text.
+    """
+    if value is None:
+        return True
+    if isinstance(value, float) and math.isnan(value):
+        return True
+    if isinstance(value, str) and not value.strip():
+        return True
+    return False
+
+
 def normalize_text(text):
-    """Lowercase, strip utility branding, collapse whitespace. Nothing fancier."""
+    """Lowercase, strip utility branding and voltage figures, collapse whitespace."""
     text = str(text).lower()
+    text = VOLTAGE_TOKEN.sub(" ", text)
     for term in UTILITY_BRANDING_TERMS:
         text = re.sub(rf"\b{re.escape(term)}\b", " ", text)
     return re.sub(r"\s+", " ", text).strip()
@@ -42,8 +68,9 @@ def build_project_text(project_name, project_type):
     -count it), and excludes coordinates/dates/cost/utility identity, which
     describe WHERE/WHEN/WHO, not WHAT the project is.
     """
-    name = normalize_text(project_name) if project_name else ""
-    type_words = normalize_text(str(project_type).replace("_", " ")) if project_type else ""
+    name = normalize_text(project_name) if not is_missing(project_name) else ""
+    type_words = (normalize_text(str(project_type).replace("_", " "))
+                 if not is_missing(project_type) else "")
     text = f"{name} {type_words}".strip()
     return text if text else None
 
@@ -68,10 +95,21 @@ def fit_tfidf(corpus):
 
     Fit once, across every unique project. Pair-level similarity is computed
     afterward by looking up two rows in this one shared vector space.
+
+    If every project is missing text, or what's left is entirely stop words,
+    scikit-learn refuses with "empty vocabulary" and raises. That must not take
+    the whole pipeline down: an empty id_to_row here makes every later
+    calculate_text_similarity() call correctly report "not available" instead,
+    consistent with every other missing-data path in this project.
     """
     ids = list(corpus.keys())
     vectorizer = TfidfVectorizer(**TFIDF_CONFIG)
-    matrix = vectorizer.fit_transform(corpus[i] for i in ids)
+    try:
+        matrix = vectorizer.fit_transform(corpus[i] for i in ids)
+    except ValueError:
+        # Empty corpus and stop-word-only corpus both land here; either way
+        # there is no usable vocabulary, and every pair must report unavailable.
+        return vectorizer, None, {}
     id_to_row = {project_id: row for row, project_id in enumerate(ids)}
     return vectorizer, matrix, id_to_row
 

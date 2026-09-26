@@ -170,7 +170,11 @@ def main():
     print(f"unique project corpus: {len(corpus)} documents "
           f"({len(duke)} Duke + {len(teco)} TECO)")
     vectorizer, matrix, id_to_row = fit_tfidf(corpus)
-    print(f"TF-IDF vocabulary size: {len(vectorizer.vocabulary_)}")
+    if matrix is None:
+        print("TF-IDF vocabulary size: 0 (no usable project text - "
+              "every pair's text similarity will report unavailable)")
+    else:
+        print(f"TF-IDF vocabulary size: {len(vectorizer.vocabulary_)}")
 
     rows = build_features(pairs, matrix, id_to_row, vectorizer)
     fields = list(pairs.columns) + SIMILARITY_FIELDS
