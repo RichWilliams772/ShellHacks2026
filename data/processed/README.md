@@ -465,27 +465,41 @@ pair (50), already in rank order. Task 5's file is read but never modified -
 `scripts/build_coordination_packages.py` verifies every package's score and
 rank match the source CSV exactly before writing anything.
 
-**The conservatism that matters here:** resource `"potential"` never comes
-from Coordination Score, distance, or schedule - `analysis/resource_rules.py`
-functions structurally cannot see any of those (tested directly via
-`inspect.signature`). It reads only project type and voltage, and requires
-**both** to agree before calling anything `HIGH`:
+**The conservatism that matters here:** *resource existence* (whether a
+category applies at all) never comes from Coordination Score, distance, or
+schedule - `match_shared_resources` structurally cannot see any of those
+(tested directly via `inspect.signature`). It reads only project type. On top
+of that, *resource strength* requires two independent structured signals
+before calling anything `HIGH`:
 
 ```
-same project type + compatible voltage  -> HIGH
-one of those two alone                  -> MEDIUM
-neither                                 -> LOW
+same project type + compatible voltage        -> HIGH
+one of those two alone                        -> MEDIUM
+neither                                       -> LOW
+any tier, but 100+ miles apart (score <= 20)  -> downgraded one level
 ```
 
 This is stricter than the base task brief asked for. Bare project-type
 matching (which the brief's own example would call HIGH on its own) is
 capped at MEDIUM here - two projects both being "transmission_upgrade" is
 real evidence, but it doesn't establish that a crane class matches, that
-either utility has spare equipment, or that mobilization is feasible. The
-real, empirical result: `DUKE-P0314__TECO-66653` scores a **perfect 100 on
-geography** but only **LOW** resource potential, because the project types
-and voltage genuinely differ - resource strength and Coordination Score are
-provably independent in this data, not just in theory.
+either utility has spare equipment, or that mobilization is feasible.
+
+**A geography-based downgrade was added after a code review** correctly
+pointed out that `DUKE-P0017__TECO-138005` - 109 miles apart, completely
+unknown relative timing - was showing `HIGH` on every resource, since type and
+voltage happened to match. My first cut had also over-read the task brief's
+own prohibition (sections 24/25 forbid *creating* a resource from geography
+alone, not from ever *tempering* one that already exists - sections 22/23
+explicitly allow the latter). Fixed: a resource already established by
+type/voltage now gets capped down one tier when the pair's own
+`geographic_score` falls in PROJECT_SPEC's existing "weak proximity" band
+(50+ miles, score <= 20) - reusing that threshold, not inventing a new one. A
+*missing* geographic_score never downgrades anything; not knowing the
+distance isn't evidence the distance is bad. `DUKE-P0314__TECO-66653` (a
+perfect 100 on geography, but project type and voltage genuinely differ)
+still lands on `LOW` - resource strength and Coordination Score remain
+provably independent, just no longer independent of feasibility.
 
 Taxonomy is 6 categories (`specialized_line_crews`, `heavy_equipment`,
 `material_logistics`, `outage_planning`, `construction_mobilization`,
@@ -498,6 +512,18 @@ this dataset.
 
 Every resource evidence sentence is phrased as a category "associated with"
 the project types, never as something the two utilities "can share."
+
+**Project objects carry what a dashboard actually needs**, added after a
+review found the package too thin to be self-sufficient: `mid_lat`/`mid_lon`
+(and the full `from`/`to` endpoints) for the map, `start`/`end`/
+`in_service_year`/`date_precision` plus `year_difference`/`same_active_year`
+in `analysis` for a year filter, and a `sources` dict per project
+(`project_source`, `geography_source`, `source_url` where Duke has one,
+`circuit_endpoint_source`/`form1_schedule` where TECO has those instead -
+joined back from the two normalized project files by `load_source_lookup()`,
+since the pair-level files never carried them). None of this required
+touching Task 5's numbers; it was purely filling out what Task 6's own
+package was leaving out.
 
 `analyze_projects(utility_a, utility_b, min_score=None, top_n=None)` in
 `analysis/pipeline.py` is the one function a backend needs - no pandas,

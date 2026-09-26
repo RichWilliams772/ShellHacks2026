@@ -42,9 +42,13 @@ RESOURCE_RULES = {
     },
 }
 
-# A category exists in the shared set purely from matching project types.
-# These thresholds decide how strongly to state that - never a probability,
-# never "these can share equipment," always "worth a planner's look."
+# A category exists in the shared set purely from matching project types -
+# that intersection is fixed and geography/schedule can never add or remove a
+# category from it (section 24/25's actual rule: don't CREATE a resource from
+# geography or schedule alone). But once a category already exists, sections
+# 22/23 explicitly allow geography and schedule to "strengthen" (or, just as
+# reasonably, weaken) how confidently to state it - an earlier version of this
+# comment overstated the prohibition as covering that case too. It doesn't.
 #
 #   HIGH    identical project type on both sides AND compatible voltage class.
 #           Two independent structured signals agreeing.
@@ -54,10 +58,19 @@ RESOURCE_RULES = {
 #   LOW     the category exists only because it is a broad category common to
 #           both project types, with no type-identity or voltage support.
 #
-# Coordination Score, distance, and schedule overlap never appear in this
-# calculation - PROJECT_SPEC section 19/24/25 forbid deriving resource
-# evidence from any of them.
+# Coordination Score itself never appears here (section 19's actual target -
+# "if coordination_score > 80: all HIGH" is exactly the shortcut banned), and
+# neither does schedule (no pair in this dataset has evidence precise enough
+# to justify a threshold - temporal precision is never better than "mixed").
+# But a real, calculated geographic_score does apply, as a downgrade only:
+# two project types matching on paper is not strong coordination evidence if
+# the projects are 100+ miles apart, per PROJECT_SPEC's own "weak proximity"
+# band (score <= 20 is exactly that band - not a new threshold invented here).
+# A MISSING geographic_score never downgrades anything - not knowing the
+# distance is not evidence the distance is bad.
 VOLTAGE_COMPATIBLE_THRESHOLD = 70
+WEAK_GEOGRAPHY_THRESHOLD = 20
+POTENTIAL_DOWNGRADE = {"HIGH": "MEDIUM", "MEDIUM": "LOW", "LOW": "LOW"}
 
 
 def get_project_resource_categories(project_type):
@@ -76,26 +89,33 @@ def match_shared_resources(project_a_type, project_b_type):
     return get_project_resource_categories(project_a_type) & get_project_resource_categories(project_b_type)
 
 
-def calculate_resource_potential(project_type_similarity, voltage_similarity):
+def calculate_resource_potential(project_type_similarity, voltage_similarity, geographic_score=None):
     """HIGH/MEDIUM/LOW for a category already confirmed to be shared.
 
     Only called once a resource is already known to be in both projects'
     category sets - this function never decides whether a resource EXISTS,
-    only how strongly to state it once it does.
+    only how strongly to state it once it does. geographic_score can only
+    move the result down a tier, never up, and never on its own - a resource
+    still requires type/voltage evidence to reach any tier at all.
     """
     same_type = project_type_similarity == 100
     voltage_compatible = voltage_similarity is not None and voltage_similarity >= VOLTAGE_COMPATIBLE_THRESHOLD
 
     if same_type and voltage_compatible:
-        return "HIGH"
-    if same_type or voltage_compatible:
-        return "MEDIUM"
-    return "LOW"
+        potential = "HIGH"
+    elif same_type or voltage_compatible:
+        potential = "MEDIUM"
+    else:
+        potential = "LOW"
+
+    if geographic_score is not None and geographic_score <= WEAK_GEOGRAPHY_THRESHOLD:
+        potential = POTENTIAL_DOWNGRADE[potential]
+    return potential
 
 
 def build_resource_evidence(resource_id, project_a_type, project_b_type,
                             project_type_similarity, voltage_similarity,
-                            voltage_label_a, voltage_label_b):
+                            voltage_label_a, voltage_label_b, geography_downgraded):
     """Deterministic sentences for one shared resource category. Always
     phrased as a category to investigate, never as a confirmed shared item -
     GridSync does not know either utility's actual equipment, crew, or
@@ -116,11 +136,16 @@ def build_resource_evidence(resource_id, project_a_type, project_b_type,
         evidence.append(f"Both projects also involve compatible voltage infrastructure "
                         f"({voltage_label_a} / {voltage_label_b}).")
 
+    if geography_downgraded:
+        evidence.append("The two known project locations are far enough apart that practical "
+                        "coordination on this category is less certain.")
+
     return evidence
 
 
 def build_shared_resources(project_a_type, project_b_type, project_type_similarity,
-                           voltage_similarity, voltage_label_a, voltage_label_b):
+                           voltage_similarity, voltage_label_a, voltage_label_b,
+                           geographic_score=None):
     """The full potential_shared_resources list for one pair, sorted for a
     stable, deterministic order (HIGH first, then alphabetical).
     """
@@ -128,14 +153,15 @@ def build_shared_resources(project_a_type, project_b_type, project_type_similari
     if not shared:
         return []
 
-    potential = calculate_resource_potential(project_type_similarity, voltage_similarity)
+    potential = calculate_resource_potential(project_type_similarity, voltage_similarity, geographic_score)
+    geography_downgraded = geographic_score is not None and geographic_score <= WEAK_GEOGRAPHY_THRESHOLD
     resources = [{
         "resource_id": resource_id,
         "display_name": DISPLAY_NAMES[resource_id],
         "potential": potential,
         "evidence": build_resource_evidence(resource_id, project_a_type, project_b_type,
                                             project_type_similarity, voltage_similarity,
-                                            voltage_label_a, voltage_label_b),
+                                            voltage_label_a, voltage_label_b, geography_downgraded),
     } for resource_id in shared]
 
     order = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}

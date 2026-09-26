@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT))
 
 from analysis.pipeline import (  # noqa: E402
     PACKAGES_JSON, SCORED_CSV, analyze_projects, build_all_packages, build_coordination_package,
-    build_opportunity_evidence,
+    build_opportunity_evidence, load_source_lookup,
 )
 
 # Language that would overstate what public planning data can support -
@@ -95,6 +95,58 @@ def test_package_contains_no_overreaching_claims():
         check(f"package does not contain {phrase!r}", phrase not in text)
 
 
+def test_project_objects_carry_map_and_schedule_fields():
+    """A dashboard must be able to plot a project and apply a year filter
+    without loading a separate CSV - regression for a real gap: these fields
+    used to be missing from the package entirely.
+    """
+    row = _sample_row()
+    package = build_coordination_package(row)
+    for side in ("project_a", "project_b"):
+        project = package[side]
+        for field in ("mid_lat", "mid_lon", "start", "end", "in_service_year",
+                     "date_precision", "status"):
+            check(f"{side}.{field} is present in the package", field in project, project.keys())
+    check("analysis includes year_difference for the year-filter requirement",
+          "year_difference" in package["analysis"])
+    check("analysis includes same_active_year",
+          "same_active_year" in package["analysis"])
+
+
+def test_project_objects_carry_sources():
+    row = _sample_row()
+    sources = load_source_lookup()
+    package = build_coordination_package(row, sources)
+    for side in ("project_a", "project_b"):
+        project = package[side]
+        check(f"{side} has a non-empty sources dict",
+              isinstance(project["sources"], dict) and len(project["sources"]) > 0,
+              project["sources"])
+        check(f"{side}.sources contains a real citation, not a placeholder",
+              any(isinstance(v, str) and len(v) > 10 for v in project["sources"].values()))
+
+
+def test_voltage_label_fallback_reaches_resource_evidence():
+    """Regression: the numeric voltage fallback was fixed in Task 5's own
+    evidence text but never reached Task 6's separate resource-evidence path -
+    a HIGH-potential resource was silently missing its voltage justification.
+    """
+    scored = pd.read_csv(SCORED_CSV)
+    eligible = scored[scored["coordination_score_eligible"]]
+    top = eligible[eligible["opportunity_rank"] == 1].iloc[0].to_dict()
+    package = build_coordination_package(top, load_source_lookup())
+    check("Duke's voltage_label is never the literal word 'None' in the package",
+          package["project_a"]["voltage_label"] != "None"
+          and package["project_a"]["voltage_label"] is not None)
+    high_resources = [r for r in package["potential_shared_resources"] if r["potential"] == "HIGH"]
+    if high_resources:
+        for resource in high_resources:
+            text = " ".join(resource["evidence"])
+            check(f"a HIGH-potential resource ({resource['resource_id']}) states its "
+                  f"voltage corroboration, not just the type match",
+                  "voltage" in text.lower(), text)
+
+
 def test_all_packages_built_and_ranked():
     scored = pd.read_csv(SCORED_CSV)
     packages = build_all_packages(scored)
@@ -114,6 +166,9 @@ def main():
     test_package_matches_source_row_exactly()
     test_package_is_json_serializable()
     test_package_contains_no_overreaching_claims()
+    test_project_objects_carry_map_and_schedule_fields()
+    test_project_objects_carry_sources()
+    test_voltage_label_fallback_reaches_resource_evidence()
     test_all_packages_built_and_ranked()
 
     # analyze_projects() interface tests - require the built JSON on disk.

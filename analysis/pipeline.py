@@ -8,10 +8,21 @@ from pathlib import Path
 import pandas as pd
 
 from analysis.resource_rules import build_shared_resources
+from analysis.scoring import voltage_label_or_fallback
 
 ROOT = Path(__file__).resolve().parents[1]
 SCORED_CSV = ROOT / "data" / "processed" / "duke_teco_scored_opportunities.csv"
 PACKAGES_JSON = ROOT / "data" / "processed" / "gridsync_opportunities.json"
+DUKE_CSV = ROOT / "data" / "processed" / "duke_projects_normalized.csv"
+TECO_CSV = ROOT / "data" / "processed" / "teco_projects_geocoded.csv"
+
+# The pair-level files (Task 2 onward) deliberately never carried these -
+# duplicating a source citation across 160 rows was documented as unnecessary
+# in Task 2's own README. Task 6's package is the first place a single project
+# appears once per opportunity, so this is where the join back to the two
+# normalized project files actually belongs, keyed by project_id.
+SOURCE_FIELDS = ["project_source", "geography_source", "source_url",
+                 "circuit_endpoint_source", "form1_schedule"]
 
 
 def clean(value):
@@ -23,14 +34,56 @@ def clean(value):
     return value
 
 
-def _project_view(row, side):
+def load_source_lookup():
+    """project_id -> {source fields}, built once from the two normalized
+    project files. Duke and TECO have different source-field schemas (Duke
+    cites a source_url, TECO cites circuit_endpoint_source/form1_schedule
+    instead) - only the fields each side actually has are included, never a
+    blank placeholder for a citation that was never filed.
+    """
+    lookup = {}
+    for path in (DUKE_CSV, TECO_CSV):
+        frame = pd.read_csv(path)
+        for row in frame.to_dict("records"):
+            lookup[row["project_id"]] = {field: clean(row.get(field)) for field in SOURCE_FIELDS
+                                         if clean(row.get(field)) is not None}
+    return lookup
+
+
+def _project_view(row, side, sources):
     prefix = f"project_{side}_"
+    voltage_label = voltage_label_or_fallback(
+        clean(row.get(f"{prefix}voltage_label")),
+        clean(row.get(f"{prefix}voltage_min_kv")), clean(row.get(f"{prefix}voltage_max_kv")))
+    project_id = clean(row[f"{prefix}id"])
+
     return {
-        "id": clean(row[f"{prefix}id"]),
+        "id": project_id,
         "utility": clean(row[f"{prefix}utility"]),
         "name": clean(row[f"{prefix}name"]),
         "project_type": clean(row[f"{prefix}type"]),
-        "voltage_label": clean(row.get(f"{prefix}voltage_label")),
+        "status": clean(row.get(f"{prefix}status")),
+        "voltage_label": voltage_label,
+        # Dates carry Task 3's own precision label alongside them - a
+        # dashboard must not treat a year-only estimate as an exact date
+        # just because it arrived in a "start"/"end" field.
+        "start": clean(row.get(f"{prefix}start")),
+        "end": clean(row.get(f"{prefix}end")),
+        "in_service_year": clean(row.get(f"{prefix}in_service_year")),
+        "date_precision": clean(row.get(f"{prefix}date_precision")),
+        # mid_lat/mid_lon is the single representative point used throughout
+        # this project for placing a project on a map (Task 1/2's own
+        # convention). from/to are also included so a corridor can be drawn
+        # as the approximate_corridor it is - never as a verified route.
+        "mid_lat": clean(row.get(f"{prefix}mid_lat")),
+        "mid_lon": clean(row.get(f"{prefix}mid_lon")),
+        "from_lat": clean(row.get(f"{prefix}from_lat")),
+        "from_lon": clean(row.get(f"{prefix}from_lon")),
+        "to_lat": clean(row.get(f"{prefix}to_lat")),
+        "to_lon": clean(row.get(f"{prefix}to_lon")),
+        "geometry_type": clean(row.get(f"{prefix}geometry_type")),
+        "location_confidence": clean(row.get(f"{prefix}location_confidence")),
+        "sources": sources.get(project_id, {}),
     }
 
 
@@ -52,19 +105,22 @@ def build_opportunity_evidence(row):
     return evidence
 
 
-def build_coordination_package(row):
+def build_coordination_package(row, sources=None):
     """One eligible pair -> one structured, JSON-serializable opportunity object.
 
     Every number here is read from Task 3/4/5 output as-is. Nothing is
     recalculated: not distance, not schedule overlap, not similarity, not the
     Coordination Score, not the rank.
     """
-    project_a, project_b = _project_view(row, "a"), _project_view(row, "b")
+    sources = sources or {}
+    project_a, project_b = _project_view(row, "a", sources), _project_view(row, "b", sources)
+    geographic_score = clean(row.get("geographic_score"))
 
     resources = build_shared_resources(
         project_a["project_type"], project_b["project_type"],
         clean(row.get("project_type_similarity")), clean(row.get("voltage_similarity")),
-        project_a["voltage_label"], project_b["voltage_label"])
+        project_a["voltage_label"], project_b["voltage_label"],
+        geographic_score=geographic_score)
 
     return {
         "opportunity_id": row["pair_id"],
@@ -75,7 +131,9 @@ def build_coordination_package(row):
             "geography_available": bool(row.get("geography_available")),
             "schedule_overlap_months": clean(row.get("schedule_overlap_months")),
             "temporal_precision": clean(row.get("temporal_precision")),
-            "geographic_score": clean(row.get("geographic_score")),
+            "year_difference": clean(row.get("year_difference")),
+            "same_active_year": clean(row.get("same_active_year")),
+            "geographic_score": geographic_score,
             "temporal_score": clean(row.get("temporal_score")),
             "text_similarity_score": clean(row.get("text_similarity_score")),
             "infrastructure_similarity": clean(row.get("infrastructure_similarity")),
@@ -101,10 +159,11 @@ def build_coordination_package(row):
     }
 
 
-def build_all_packages(scored):
+def build_all_packages(scored, sources=None):
     """Coordination Packages for every score-eligible pair, already in rank order."""
+    sources = sources if sources is not None else load_source_lookup()
     eligible = scored[scored["coordination_score_eligible"]].sort_values("opportunity_rank")
-    return [build_coordination_package(row) for row in eligible.to_dict("records")]
+    return [build_coordination_package(row, sources) for row in eligible.to_dict("records")]
 
 
 def _matches_utility_pair(row, utility_a, utility_b):

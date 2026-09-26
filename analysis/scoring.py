@@ -79,7 +79,7 @@ def calculate_coordination_score(geographic, temporal, text_similarity, infrastr
     return round(raw, DISPLAY_DECIMALS) if raw is not None else None
 
 
-def _voltage_label(label, min_kv, max_kv):
+def voltage_label_or_fallback(label, min_kv, max_kv):
     """Duke has no filed voltage_label (TECO's schema does) - build one from
     min/max so evidence never prints the literal word 'None'.
     """
@@ -127,9 +127,9 @@ def build_evidence(row):
         evidence.append(f"Project types differ ({type_a} vs {type_b}).")
 
     voltage_similarity = row.get("voltage_similarity")
-    label_a = _voltage_label(row.get("project_a_voltage_label"),
+    label_a = voltage_label_or_fallback(row.get("project_a_voltage_label"),
                              row.get("project_a_voltage_min_kv"), row.get("project_a_voltage_max_kv"))
-    label_b = _voltage_label(row.get("project_b_voltage_label"),
+    label_b = voltage_label_or_fallback(row.get("project_b_voltage_label"),
                              row.get("project_b_voltage_min_kv"), row.get("project_b_voltage_max_kv"))
     if voltage_similarity == 100 and label_a and label_b:
         evidence.append(f"Both projects involve compatible voltage infrastructure ({label_a} / {label_b}).")

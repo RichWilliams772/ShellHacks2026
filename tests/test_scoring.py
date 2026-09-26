@@ -9,7 +9,7 @@ sys.path.insert(0, str(ROOT))
 
 from analysis.scoring import (  # noqa: E402
     calculate_coordination_score, components_available, is_score_eligible,
-    rank_opportunities, score_weight_coverage,
+    rank_opportunities, score_weight_coverage, voltage_label_or_fallback,
 )
 
 failures = []
@@ -115,6 +115,27 @@ def test_rounding_happens_only_at_output():
           abs(score - round(expected, 1)) < 0.05, f"got {score}, expected ~{round(expected,1)}")
 
 
+def test_voltage_label_prefers_the_real_filed_label():
+    """Regression: a rename once corrupted the column name this reads,
+    silently discarding a utility's real filed label ("138/230 kV") in favor
+    of a numeric-derived one ("138-230 kV") every single time. This must
+    never happen - a real filed label always wins over the fallback.
+    """
+    check("a real filed label is returned as-is, not replaced by the numeric fallback",
+          voltage_label_or_fallback("138/230 kV", 138, 230) == "138/230 kV")
+    check("a real filed label wins even when min/max would format differently",
+          voltage_label_or_fallback("69 kV", 69, 69) == "69 kV")
+
+
+def test_voltage_label_falls_back_only_when_no_label_is_filed():
+    check("no label, single voltage -> 'X kV'",
+          voltage_label_or_fallback(None, 230, 230) == "230 kV")
+    check("no label, a range -> 'X-Y kV'",
+          voltage_label_or_fallback(None, 115, 230) == "115-230 kV")
+    check("no label and no min/max -> None, not a fabricated string",
+          voltage_label_or_fallback(None, None, None) is None)
+
+
 def _row(pair_id, score, geo, temporal, eligible=True):
     return {"pair_id": pair_id, "coordination_score": score, "geographic_score": geo,
             "temporal_score": temporal, "coordination_score_eligible": eligible}
@@ -165,6 +186,8 @@ def main():
     test_score_weight_coverage()
     test_score_is_deterministic()
     test_rounding_happens_only_at_output()
+    test_voltage_label_prefers_the_real_filed_label()
+    test_voltage_label_falls_back_only_when_no_label_is_filed()
     test_ranking_orders_by_score_descending()
     test_ranking_tie_break_is_deterministic()
     test_ineligible_rows_get_null_rank()

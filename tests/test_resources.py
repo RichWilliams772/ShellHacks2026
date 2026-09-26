@@ -111,18 +111,52 @@ def test_high_score_alone_does_not_create_resources():
               "coordination_score" not in params and "score" not in params, params)
 
 
-def test_geography_alone_does_not_create_resources():
-    for fn in (calculate_resource_potential, match_shared_resources):
-        params = set(inspect.signature(fn).parameters)
-        check(f"{fn.__name__} has no distance/geography parameter",
-              not params & {"distance", "distance_miles", "geographic_score"}, params)
+def test_resource_existence_never_depends_on_geography_or_schedule():
+    """Whether a category exists at all comes solely from project type -
+    match_shared_resources (existence) must never see geography or schedule.
+    geographic_score IS a legitimate input to calculate_resource_potential
+    (strength of an already-existing category, per PROJECT_SPEC section 22/23
+    - "may strengthen/weaken practical relevance"), but only as a downgrade;
+    the test below proves it can't do the opposite.
+    """
+    params = set(inspect.signature(match_shared_resources).parameters)
+    check("match_shared_resources (resource existence) has no geography parameter",
+          not params & {"distance", "distance_miles", "geographic_score"}, params)
+    check("match_shared_resources (resource existence) has no schedule parameter",
+          not params & {"schedule_overlap", "temporal_score", "schedule_overlap_months"}, params)
 
-
-def test_schedule_alone_does_not_create_resources():
-    for fn in (calculate_resource_potential, match_shared_resources):
+    for fn in (calculate_resource_potential,):
         params = set(inspect.signature(fn).parameters)
-        check(f"{fn.__name__} has no schedule/temporal parameter",
+        check(f"{fn.__name__} has no schedule parameter (no pair in this dataset "
+              f"has temporal evidence precise enough to justify one)",
               not params & {"schedule_overlap", "temporal_score", "schedule_overlap_months"}, params)
+
+
+def test_geographic_score_can_only_downgrade_never_create_or_upgrade():
+    """A far-apart pair must never score HIGHER than a close pair with
+    otherwise-identical type/voltage evidence, and geography alone (with no
+    type/voltage support at all) must never produce a resource.
+    """
+    close = calculate_resource_potential(100, 100, geographic_score=100)
+    far = calculate_resource_potential(100, 100, geographic_score=0)
+    check("identical type+voltage evidence: far apart is never rated higher than close",
+          _rank(far) <= _rank(close), f"close={close} far={far}")
+    check("a strong geographic_score alone does not upgrade weak type/voltage evidence",
+          calculate_resource_potential(0, None, geographic_score=100) == "LOW")
+    check("a missing geographic_score never downgrades - absence isn't evidence of distance",
+          calculate_resource_potential(100, 100, geographic_score=None) == "HIGH")
+
+
+def _rank(potential):
+    return {"HIGH": 3, "MEDIUM": 2, "LOW": 1}[potential]
+
+
+def test_far_apart_pair_is_downgraded_from_high():
+    """The concrete case this rule exists for: DUKE-P0017 x TECO-138005 - same
+    type, compatible voltage, but 109 miles apart. Must not read HIGH."""
+    potential = calculate_resource_potential(100, 100, geographic_score=0)
+    check("109-mile-apart pair with otherwise-HIGH evidence is downgraded to MEDIUM",
+          potential == "MEDIUM", potential)
 
 
 def test_no_resources_when_intersection_is_empty():
@@ -156,8 +190,9 @@ def main():
     test_resource_potential_low_when_neither_signal_present()
     test_resource_potential_never_reaches_high_from_type_match_alone()
     test_high_score_alone_does_not_create_resources()
-    test_geography_alone_does_not_create_resources()
-    test_schedule_alone_does_not_create_resources()
+    test_resource_existence_never_depends_on_geography_or_schedule()
+    test_geographic_score_can_only_downgrade_never_create_or_upgrade()
+    test_far_apart_pair_is_downgraded_from_high()
     test_no_resources_when_intersection_is_empty()
     test_evidence_never_claims_confirmed_sharing()
 
