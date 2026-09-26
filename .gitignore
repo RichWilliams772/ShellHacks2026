@@ -1,0 +1,6 @@
+# Aaron Green
+# Files git should ignore.
+
+.venv/
+__pycache__/
+*.pyc
