@@ -5,14 +5,17 @@ import { humanize } from "@/lib/format";
 export interface FilterState {
   year: number | "all";
   projectType: string | "all";
-  maxDistance: number; // miles
+  maxDistance: number; // miles; ANY_DISTANCE means no limit
   minScore: number;
 }
+
+// Top of the slider = no distance limit, so far-apart pairs are never unreachable.
+export const ANY_DISTANCE = 100;
 
 export const DEFAULT_FILTERS: FilterState = {
   year: "all",
   projectType: "all",
-  maxDistance: 50,
+  maxDistance: ANY_DISTANCE,
   minScore: 0,
 };
 
@@ -60,7 +63,8 @@ export default function Filters({ value, onChange, years, projectTypes }: Props)
         </select>
       </label>
       <label className="text-xs font-medium text-slate-600">
-        Max distance: <span className="tabular-nums text-slate-900">{value.maxDistance} mi</span>
+        Max distance:{" "}
+        <span className="tabular-nums text-slate-900">{value.maxDistance >= ANY_DISTANCE ? "Any" : `${value.maxDistance} mi`}</span>
         <input
           type="range"
           min={5}

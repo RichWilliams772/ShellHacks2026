@@ -11,7 +11,7 @@ export default function ScoreBadge({ score, size = "md" }: { score: number; size
   const sz = size === "lg" ? "px-4 py-2 text-2xl" : "px-2.5 py-1 text-sm";
   return (
     <span className={`inline-flex items-baseline gap-0.5 rounded-lg border font-semibold tabular-nums ${tone} ${sz}`}>
-      {score}
+      {Math.round(score)}
       <span className="text-[0.7em] font-medium opacity-70">/100</span>
     </span>
   );

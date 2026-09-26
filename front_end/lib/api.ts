@@ -24,7 +24,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 // ---------------------------------------------------------------------------
 // Normalization: converts the backend's response into lib/types.ts.
 // Accepts both the PROJECT_SPEC §24 shape and the shape in the frontend brief
-// (opportunity_id / analysis / shared_resources / name / construction_start).
+// (opportunity_id / analysis / shared_resources / name / construction_start),
+// plus the data-analysis CSV column names (mid_lat / project_start / project_source …).
 // It only renames and fills gaps with null — it never computes a score,
 // distance, overlap, confidence, or resource.
 // ---------------------------------------------------------------------------
@@ -47,9 +48,9 @@ function precision(v: unknown): GeometryPrecision | null {
   return null;
 }
 
-function strength(v: unknown): Strength {
+function strength(v: unknown): Strength | null {
   const s = str(v)?.toUpperCase();
-  return s === "HIGH" || s === "MEDIUM" ? s : "LOW";
+  return s === "HIGH" || s === "MEDIUM" || s === "LOW" ? s : null;
 }
 
 function normalizeProject(r: Raw): Project {
@@ -59,18 +60,20 @@ function normalizeProject(r: Raw): Project {
     project_name: str(r.project_name) ?? str(r.name) ?? String(r.id ?? "Unnamed project"),
     project_type: str(r.project_type) ?? "unknown",
     description: str(r.description),
-    voltage_kv: num(r.voltage_kv),
-    latitude: num(r.latitude),
-    longitude: num(r.longitude),
+    // Duke has a min/max range; the data team's convention is to use the higher value (as TECO's voltage_kv does).
+    voltage_kv: num(r.voltage_kv) ?? num(r.voltage_max_kv),
+    // mid_lat/mid_lon = the data team's representative point (corridor midpoint or substation).
+    latitude: num(r.latitude) ?? num(r.mid_lat),
+    longitude: num(r.longitude) ?? num(r.mid_lon),
     geometry: r.geometry && obj(r.geometry).type ? (r.geometry as GeoJSON.Geometry) : null,
     geometry_precision: precision(r.geometry_precision ?? r.geometry_type),
     location_confidence: confidence(r.location_confidence),
-    start_date: str(r.start_date) ?? str(r.construction_start),
-    end_date: str(r.end_date) ?? str(r.in_service_date),
+    start_date: str(r.start_date) ?? str(r.construction_start) ?? str(r.project_start),
+    end_date: str(r.end_date) ?? str(r.project_end) ?? str(r.in_service_date),
     status: str(r.status),
-    capital_cost: num(r.capital_cost),
+    capital_cost: num(r.capital_cost) ?? num(r.project_cost),
     customers_impacted: num(r.customers_impacted),
-    source_name: str(r.source_name) ?? "Source not provided",
+    source_name: str(r.source_name) ?? str(r.project_source) ?? "Source not provided",
     source_url: str(r.source_url) ?? "",
     source_document: str(r.source_document),
     source_page: (r.source_page as string | number | null) ?? null,
@@ -84,7 +87,7 @@ function normalizeResources(o: Raw): SharedResource[] {
   if (!Array.isArray(list)) return [];
   return list
     .map((x) => {
-      if (typeof x === "string") return { name: x, strength: "LOW" as Strength };
+      if (typeof x === "string") return { name: x, strength: null };
       const r = obj(x);
       const name = str(r.name) ?? str(r.resource);
       return name ? { name, strength: strength(r.strength ?? r.potential) } : null;
@@ -98,6 +101,12 @@ function normalizeOpportunity(o: Raw, i: number): Opportunity | null {
   const b = normalizeProject(obj(o.project_b));
   // Spec puts metrics in `features`; the brief puts them in `analysis`. Read both.
   const f = { ...obj(o.analysis), ...obj(o.features) };
+  // A missing score is not a score of 0 — skip the row rather than rank it last.
+  const score = num(o.coordination_score) ?? num(f.coordination_score);
+  if (score == null) {
+    console.warn(`GridSync: opportunity ${a.id} ↔ ${b.id} has no coordination_score; skipped.`);
+    return null;
+  }
   return {
     id: String(o.id ?? o.opportunity_id ?? `${a.id}__${b.id}__${i}`),
     project_a: a,
@@ -114,7 +123,7 @@ function normalizeOpportunity(o: Raw, i: number): Opportunity | null {
       project_similarity: num(f.project_similarity),
       infrastructure_similarity: num(f.infrastructure_similarity),
     },
-    coordination_score: num(o.coordination_score) ?? num(f.coordination_score) ?? 0,
+    coordination_score: score,
     reasons: Array.isArray(o.reasons) ? o.reasons.filter((r): r is string => typeof r === "string") : [],
     coordination_package: { resources: normalizeResources(o) },
   };

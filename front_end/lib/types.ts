@@ -54,7 +54,7 @@ export type Strength = "HIGH" | "MEDIUM" | "LOW";
 
 export interface SharedResource {
   name: string; // e.g. "specialized_line_crews"
-  strength: Strength;
+  strength: Strength | null; // null when the backend didn't classify it (e.g. plain-string resources)
 }
 
 export interface CoordinationPackage {

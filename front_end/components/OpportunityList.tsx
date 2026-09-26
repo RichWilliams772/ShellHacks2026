@@ -10,6 +10,8 @@ interface Props {
   rankOf: Map<string, number>;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  total: number; // before filters, to tell "none found" apart from "all filtered out"
+  onResetFilters: () => void;
 }
 
 function ProjectLine({ utility, name }: { utility: string; name: string }) {
@@ -22,11 +24,20 @@ function ProjectLine({ utility, name }: { utility: string; name: string }) {
   );
 }
 
-export default function OpportunityList({ opportunities, rankOf, selectedId, onSelect }: Props) {
+export default function OpportunityList({ opportunities, rankOf, selectedId, onSelect, total, onResetFilters }: Props) {
   if (opportunities.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
-        No coordination opportunities matched the current criteria. Try lowering the minimum coordination score or selecting another project type.
+        {total === 0 ? (
+          "The analysis found no coordination opportunities between these utilities."
+        ) : (
+          <>
+            All {total} opportunities are hidden by the current filters.{" "}
+            <button type="button" onClick={onResetFilters} className="font-semibold text-slate-900 underline">
+              Reset filters
+            </button>
+          </>
+        )}
       </div>
     );
   }
@@ -58,7 +69,9 @@ export default function OpportunityList({ opportunities, rankOf, selectedId, onS
                 <ScoreBadge score={o.coordination_score} />
               </div>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-                <span>{fmtMiles(o.features.distance_miles)} apart</span>
+                <span>
+                  {o.features.distance_miles == null ? "Distance: not available" : `${fmtMiles(o.features.distance_miles)} apart`}
+                </span>
                 <span>
                   {overlap == null ? "Schedule: not available" : overlap === 0 ? "No schedule overlap" : `${fmtMonths(overlap)} schedule overlap`}
                 </span>

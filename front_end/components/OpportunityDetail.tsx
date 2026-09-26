@@ -205,8 +205,8 @@ export default function OpportunityDetail({ o, rank, onClose }: { o: Opportunity
           <h3 className="text-sm font-semibold text-slate-900">Why this opportunity?</h3>
           {o.reasons.length > 0 ? (
             <ul className="mt-2 space-y-1.5">
-              {o.reasons.map((r) => (
-                <li key={r} className="flex gap-2 text-sm text-slate-700">
+              {o.reasons.map((r, i) => (
+                <li key={i} className="flex gap-2 text-sm text-slate-700">
                   <span className="text-emerald-600">✓</span>
                   {r}
                 </li>
@@ -225,10 +225,12 @@ export default function OpportunityDetail({ o, rank, onClose }: { o: Opportunity
               {resources.map((r) => (
                 <li key={r.name} className="rounded-lg border border-slate-200 px-3 py-2">
                   <p className="text-sm font-medium text-slate-800">{humanize(r.name)}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Potential:{" "}
-                    <span className={`rounded border px-1.5 py-0.5 font-semibold ${STRENGTH_STYLE[r.strength]}`}>{r.strength}</span>
-                  </p>
+                  {r.strength && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Potential:{" "}
+                      <span className={`rounded border px-1.5 py-0.5 font-semibold ${STRENGTH_STYLE[r.strength]}`}>{r.strength}</span>
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>

@@ -8,7 +8,7 @@ import { years as yearsOf } from "@/lib/format";
 import Header from "./Header";
 import UtilityComparison from "./UtilityComparison";
 import KpiCards from "./KpiCards";
-import Filters, { DEFAULT_FILTERS, type FilterState } from "./Filters";
+import Filters, { ANY_DISTANCE, DEFAULT_FILTERS, type FilterState } from "./Filters";
 import OpportunityList from "./OpportunityList";
 import OpportunityDetail from "./OpportunityDetail";
 import MapPanel from "./MapPanel";
@@ -25,6 +25,8 @@ export default function Dashboard() {
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  // The pair the current results belong to; the dropdowns may change after an analysis.
+  const [analyzed, setAnalyzed] = useState<[string, string]>([DEFAULT_UTILITY_A, DEFAULT_UTILITY_B]);
   const detailRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,14 +36,16 @@ export default function Dashboard() {
   }, []);
 
   async function runAnalysis() {
+    const pair: [string, string] = [utilityA, utilityB];
     setStatus("loading");
     setError(null);
     setSelectedId(null);
     try {
       const [res, projects] = await Promise.all([
-        analyze({ utility_a: utilityA, utility_b: utilityB }),
+        analyze({ utility_a: pair[0], utility_b: pair[1] }),
         getProjects(),
       ]);
+      setAnalyzed(pair);
       setData(res);
       setAllProjects(projects);
       setFilters(DEFAULT_FILTERS);
@@ -78,7 +82,7 @@ export default function Dashboard() {
     return opportunities
       .filter((o) => {
         const d = o.features.distance_miles;
-        if (d != null && d > filters.maxDistance) return false; // unknown distance stays visible
+        if (d != null && filters.maxDistance < ANY_DISTANCE && d > filters.maxDistance) return false; // unknown distance stays visible
         if (o.coordination_score < filters.minScore) return false;
         if (filters.projectType !== "all" && o.project_a.project_type !== filters.projectType && o.project_b.project_type !== filters.projectType)
           return false;
@@ -97,14 +101,14 @@ export default function Dashboard() {
   // Map shows every project from the two utilities; falls back to projects inside opportunities.
   const mapProjects = useMemo(() => {
     const byId = new Map<string, Project>();
-    const wanted = new Set([utilityA, utilityB]);
+    const wanted = new Set(analyzed);
     for (const p of allProjects) if (wanted.has(p.utility)) byId.set(p.id, p);
     for (const o of opportunities) {
       byId.set(o.project_a.id, o.project_a);
       byId.set(o.project_b.id, o.project_b);
     }
     return [...byId.values()];
-  }, [allProjects, opportunities, utilityA, utilityB]);
+  }, [allProjects, opportunities, analyzed]);
 
   const isDemo = USE_MOCK || mapProjects.some((p) => p.data_type === "demo");
 
@@ -153,14 +157,14 @@ export default function Dashboard() {
           loading={loading}
           projectsAnalyzed={ready ? data!.projects_analyzed : null}
           opportunities={ready ? opportunities.length : null}
-          highestScore={ready && opportunities.length > 0 ? Math.max(...opportunities.map((o) => o.coordination_score)) : null}
+          highestScore={ready && opportunities.length > 0 ? Math.round(Math.max(...opportunities.map((o) => o.coordination_score))) : null}
           utilitiesCompared={ready ? 2 : null}
         />
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
           <MapPanel
             projects={ready ? mapProjects : []}
-            utilities={[utilityA, utilityB]}
+            utilities={ready ? analyzed : [utilityA, utilityB]}
             selected={selected}
             onSelectProject={selectByProject}
           />
@@ -194,7 +198,14 @@ export default function Dashboard() {
                 </div>
               )}
               {ready && (
-                <OpportunityList opportunities={filtered} rankOf={rankOf} selectedId={selectedId} onSelect={select} />
+                <OpportunityList
+                  opportunities={filtered}
+                  rankOf={rankOf}
+                  selectedId={selectedId}
+                  onSelect={select}
+                  total={opportunities.length}
+                  onResetFilters={() => setFilters(DEFAULT_FILTERS)}
+                />
               )}
             </div>
           </aside>

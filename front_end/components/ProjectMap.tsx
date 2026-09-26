@@ -41,6 +41,16 @@ function markerIcon(p: Project, selected: boolean, dimmed: boolean) {
   return L.divIcon({ html, className: "", iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
 }
 
+// After an analysis loads, frame every located project (Duke spans most of the state, not just Tampa Bay).
+function FitToProjects({ projects }: { projects: Project[] }) {
+  const map = useMap();
+  useEffect(() => {
+    const pts = projects.filter(hasPoint).map((p): [number, number] => [p.latitude!, p.longitude!]);
+    if (pts.length > 0) map.fitBounds(pts, { padding: [40, 40], maxZoom: 10 });
+  }, [projects, map]);
+  return null;
+}
+
 function FitToSelection({ selected }: { selected: Opportunity | null }) {
   const map = useMap();
   useEffect(() => {
@@ -106,6 +116,7 @@ export default function ProjectMap({ projects, selected, onSelectProject }: Prop
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      <FitToProjects projects={projects} />
       <FitToSelection selected={selected} />
 
       {/* Line geometry. Only "route" is drawn solid; approximate/endpoint geometry is dashed and labeled. */}
