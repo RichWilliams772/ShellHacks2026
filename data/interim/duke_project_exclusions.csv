@@ -1,0 +1,7 @@
+project_id,project_name,owner_original,status,estimated_in_service_year,exclusion_reason
+P-0056,Boyette Road to CR 672,Tampa Electric,Construction,,not_duke_energy_florida
+P-0123,Crystal River - Bronson Transmission Line Project,Duke Energy,Complete,2024,completed_historical_project
+P-0312,Orlando St. Cloud Resiliency Connection,Orlando Utilities Commission,Construction,2025,not_duke_energy_florida
+P-0451,Southern Oaks Reliability Project,Duke Energy,Complete,2024,completed_historical_project
+P-0462,Sweatt - Whidden Transmission Line,Florida Power & Light,Construction,2026,not_duke_energy_florida
+P-0494,Williston to Bronson Project,Duke Energy,Complete,2024,completed_historical_project
