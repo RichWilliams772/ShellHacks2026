@@ -86,6 +86,30 @@ Provenance fields:
 
 The loader does not check that a `public` row is actually a Duke or TECO filing. It only requires the provenance fields to be present.
 
+## Opportunity explanation
+
+`POST /assistant/query` still filters structured results when `opportunity_id` is omitted, and `llm_used` stays false. Supply `opportunity_id` to explain one opportunity that `/analyze` already returned. The server sends that opportunity's evidence to one chat-completions call. The model is instructed not to invent distances, dates, scores, resources, savings, or a recommendation. `llm_used` is true only when that call returns text.
+
+Set these in the environment. Do not commit the key.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `GRIDSYNC_LLM_API_KEY` | yes, for a model call | Bearer token. Absent key returns the structured record and `llm_used: false`. |
+| `GRIDSYNC_LLM_MODEL` | no | Chat model. Defaults to `gpt-4o-mini`. |
+| `GRIDSYNC_LLM_BASE_URL` | no | OpenAI-compatible API origin. Defaults to `https://api.openai.com/v1`. |
+
+```bash
+export GRIDSYNC_LLM_API_KEY="your-key"
+export GRIDSYNC_LLM_MODEL="gpt-4o-mini"
+export GRIDSYNC_LLM_BASE_URL="https://api.openai.com/v1"
+
+curl -s -X POST http://127.0.0.1:8000/assistant/query \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Explain this opportunity.","utility_a":"Duke Energy Florida","utility_b":"Tampa Electric","opportunity_id":"DUKE-P0132__TECO-138005"}'
+```
+
+A provider failure also keeps `llm_used` false and returns the structured record. `15.05` miles on the top public pair is the minimum distance between known endpoints.
+
 ## Not implemented
 
 - PDF or XLSX scraping

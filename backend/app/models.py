@@ -421,6 +421,16 @@ class AssistantQuery(BaseModel):
     query: str = Field(min_length=1, max_length=1000)
     utility_a: str | None = None
     utility_b: str | None = None
+    opportunity_id: str | None = None
+
+    @field_validator("opportunity_id", mode="before")
+    @classmethod
+    def _blank_opportunity_id(cls, value: object) -> object:
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
 
 class AssistantResponse(DataEnvelope):

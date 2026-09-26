@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from app.assistant import answer_query
+from app.assistant import answer_query, explain_opportunity
 from app.config import SCORE_INTERPRETATION
 from app.errors import (
     OpportunityNotFoundError,
@@ -174,9 +174,20 @@ def analyze(body: AnalyzeRequest, request: Request) -> AnalyzeResponse:
 @router.post("/assistant/query", response_model=AssistantResponse)
 def assistant_query(body: AssistantQuery, request: Request) -> AssistantResponse:
     service = _service(request)
-    left, right = _utility_pair(service, body.utility_a, body.utility_b)
-    analyzed = _analyze(service, left, right, OpportunityFilters())
-    result = answer_query(body.query, analyzed.opportunities)
+    if body.opportunity_id:
+        try:
+            selected = service.get_opportunity(body.opportunity_id)
+        except OpportunityNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        result = explain_opportunity(
+            body.query,
+            selected,
+            client=getattr(request.app.state, "llm_client", None),
+        )
+    else:
+        left, right = _utility_pair(service, body.utility_a, body.utility_b)
+        analyzed = _analyze(service, left, right, OpportunityFilters())
+        result = answer_query(body.query, analyzed.opportunities)
     envelope = service.envelope()
     return AssistantResponse(
         dataset_status=envelope.dataset_status,
