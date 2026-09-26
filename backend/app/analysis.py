@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from app.analysis_support import measured_features
 from app.config import Settings
 from app.geographic import compare_projects as compare_geography
 from app.models import (
     CoordinationPackage,
+    CoordinationResource,
     FeatureVector,
     Opportunity,
     Project,
@@ -26,14 +25,6 @@ HIGH_OPPORTUNITY_NOTE = (
     "Prototype display threshold for counting higher-scoring opportunities. "
     "It is not a probability cutoff or a recommendation to coordinate."
 )
-
-
-@dataclass(frozen=True)
-class OpportunityFilters:
-    year: int | None = None
-    project_type: str | None = None
-    max_distance_miles: float | None = None
-    min_coordination_score: float | None = None
 
 
 def analyze_pair(project_a: Project, project_b: Project, settings: Settings) -> Opportunity:
@@ -139,15 +130,28 @@ def analyze_pair(project_a: Project, project_b: Project, settings: Settings) -> 
 
 
 def _package_model(package: CoordinationPackageResult) -> CoordinationPackage:
+    shared = [
+        SharedResource(
+            resource=item.resource,
+            label=item.label,
+            strength=item.strength,
+            reason=item.reason,
+        )
+        for item in package.shared_resources
+    ]
     return CoordinationPackage(
-        shared_resources=[
-            SharedResource(
+        shared_resources=shared,
+        resources=[
+            CoordinationResource(
+                name=item.resource,
                 resource=item.resource,
                 label=item.label,
                 strength=item.strength,
+                potential=item.strength,
                 reason=item.reason,
+                evidence=[item.reason],
             )
-            for item in package.shared_resources
+            for item in shared
         ],
         evidence_note=package.evidence_note,
     )

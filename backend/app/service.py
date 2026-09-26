@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from collections import Counter
 
-from app.analysis import HIGH_OPPORTUNITY_NOTE, OpportunityFilters, analyze_pair
+from app.analysis import HIGH_OPPORTUNITY_NOTE, analyze_pair
 from app.config import SCORE_INTERPRETATION, Settings
 from app.errors import OpportunityNotFoundError, ProjectNotFoundError, UnknownUtilityError
+from app.filters import OpportunityFilters
 from app.fixtures import DUKE, TECO
 from app.models import AnalyzeResponse, Opportunity, Project, UtilitySummary
 from app.pairing import canonicalize_utility, generate_cross_pairs, parse_opportunity_id
@@ -119,6 +120,12 @@ class AnalysisService:
         utility_b: str,
         filters: OpportunityFilters,
     ) -> AnalyzeResponse:
+        if self.settings.project_catalog == "processed":
+            from app.public_analysis import analyze_processed
+
+            return analyze_processed(
+                self.projects, utility_a, utility_b, filters, self.settings
+            )
         pairs = generate_cross_pairs(self.analysis_projects, utility_a, utility_b)
         known = {project.utility for project in self.analysis_projects}
         resolved_a = canonicalize_utility(utility_a, known)
@@ -162,6 +169,12 @@ class AnalysisService:
         )
 
     def get_opportunity(self, opportunity_id_value: str) -> Opportunity:
+        if self.settings.project_catalog == "processed":
+            from app.public_analysis import get_processed_opportunity
+
+            return get_processed_opportunity(
+                self.projects, opportunity_id_value, self.settings
+            )
         try:
             left_id, right_id = parse_opportunity_id(opportunity_id_value)
         except ValueError as exc:

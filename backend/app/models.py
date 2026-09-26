@@ -278,9 +278,10 @@ class FeatureVector(BaseModel):
     distance_miles: float | None
     distance_km: float | None
     distance_method: Literal["point_haversine", "linestring_vertices"] | None
+    distance_label: str | None = None
     proximity_band: Literal["very_strong", "strong", "moderate", "weak"] | None
     distance_similarity: float | None
-    temporal_precision: Literal["day", "year", "unavailable"]
+    temporal_precision: Literal["day", "month", "year", "mixed", "unknown", "unavailable"] | None
     start_date_difference: int | None
     end_date_difference: int | None
     start_year_difference: int | None
@@ -292,6 +293,8 @@ class FeatureVector(BaseModel):
     schedule_overlap_ratio: float | None
     schedule_similarity: float | None
     overlap_kind: Literal["identical", "full", "partial", "none"] | None
+    year_difference: float | None = None
+    same_active_year: bool | None = None
     project_type_similarity: float | None
     voltage_similarity: float | None
     status_similarity: float | None
@@ -321,9 +324,42 @@ class SharedResource(BaseModel):
     reason: str
 
 
+class CoordinationResource(BaseModel):
+    """Resource row Rob's frontend reads from coordination_package.resources."""
+
+    name: str
+    resource: str
+    label: str
+    strength: Literal["HIGH", "MEDIUM", "LOW"]
+    potential: Literal["HIGH", "MEDIUM", "LOW"]
+    reason: str
+    evidence: list[str] = Field(default_factory=list)
+
+
 class CoordinationPackage(BaseModel):
     shared_resources: list[SharedResource]
+    resources: list[CoordinationResource] = Field(default_factory=list)
     evidence_note: str
+
+
+class PublishedComponents(BaseModel):
+    """Aaron's 0–100 component scores, copied beside the 0–1 API feature fields."""
+
+    geographic_score: float | None = None
+    temporal_score: float | None = None
+    text_similarity_score: float | None = None
+    infrastructure_similarity: float | None = None
+    scale: Literal["0_to_100"] = "0_to_100"
+    score_confidence: str | None = None
+    opportunity_rank: int | None = None
+    geography_available: bool | None = None
+
+
+class DataConfidence(BaseModel):
+    geography: str | None = None
+    temporal: str | None = None
+    similarity: str | None = None
+    overall_score: str | None = None
 
 
 class Opportunity(BaseModel):
@@ -342,6 +378,8 @@ class Opportunity(BaseModel):
     coordination_package: CoordinationPackage
     data_type: Literal["demo", "public", "mixed"]
     coarse_filter_excluded: bool
+    published_components: PublishedComponents | None = None
+    data_confidence: DataConfidence | None = None
 
 
 class AnalyzeRequest(BaseModel):

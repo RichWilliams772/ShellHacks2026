@@ -6,7 +6,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from app.analysis import OpportunityFilters
 from app.assistant import answer_query
 from app.config import SCORE_INTERPRETATION
 from app.errors import (
@@ -15,6 +14,7 @@ from app.errors import (
     SameUtilityError,
     UnknownUtilityError,
 )
+from app.filters import OpportunityFilters
 from app.models import (
     AnalyzeRequest,
     AnalyzeResponse,

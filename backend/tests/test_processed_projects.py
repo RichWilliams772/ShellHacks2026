@@ -75,7 +75,7 @@ def test_both_processed_files_load_without_filling_blanks() -> None:
     assert labeled.source_url is None
 
 
-def test_retrieval_endpoints_serve_public_records_and_keep_scores_demo() -> None:
+def test_retrieval_endpoints_serve_public_records_and_public_opportunities() -> None:
     utilities = client.get("/utilities")
     assert utilities.status_code == 200
     body = utilities.json()
@@ -123,11 +123,11 @@ def test_retrieval_endpoints_serve_public_records_and_keep_scores_demo() -> None
     )
     assert analyze.status_code == 200
     scored = analyze.json()
-    assert scored["dataset_status"] == "demo"
-    assert scored["contains_demo_data"] is True
-    assert scored["contains_verified_public_data"] is False
-    assert "demo" in scored["data_notice"].lower()
-    for opportunity in scored["opportunities"]:
-        assert opportunity["data_type"] == "demo"
-        assert opportunity["project_a"]["id"].startswith("DUKE-DEMO-")
-        assert opportunity["project_b"]["id"].startswith("TECO-DEMO-")
+    assert scored["dataset_status"] == "verified_public"
+    assert scored["contains_demo_data"] is False
+    assert scored["contains_verified_public_data"] is True
+    assert scored["pairs_evaluated"] == 160
+    assert scored["opportunity_count"] == 50
+    assert scored["opportunities"][0]["id"] == "DUKE-P0132__TECO-138005"
+    assert scored["opportunities"][0]["coordination_score"] == 63.3
+    assert scored["opportunities"][0]["data_type"] == "public"

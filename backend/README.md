@@ -20,11 +20,12 @@ uvicorn app.main:app --reload
 When `data/processed/duke_projects_normalized.csv` and
 `data/processed/teco_projects_geocoded.csv` are present, the server selects the
 processed catalog unless `GRIDSYNC_PROJECT_CATALOG=demo`. Set
-`GRIDSYNC_PROJECT_CATALOG=processed` to force that catalog.
+`GRIDSYNC_PROJECT_CATALOG=processed` to force that catalog, or
+`GRIDSYNC_PROJECT_CATALOG=demo` to keep the labeled demo engine.
 
 `GET /utilities`, `GET /projects`, and `GET /projects/{id}` read the selected
-catalog. `POST /analyze` and `GET /opportunities` keep using demo fixtures when
-the processed catalog is selected, and those responses stay `dataset_status: demo`.
+catalog. In processed mode, `POST /analyze` and `GET /opportunities` copy Aaron's
+precomputed public opportunities. Explicit demo mode still scores the demo fixtures.
 
 ## Demo data
 
