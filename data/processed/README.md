@@ -163,3 +163,82 @@ empty map with no error. The mapping is:
 
 Pick one set of names for the API response and say so — this is a contract,
 not something either side should guess at.
+
+---
+
+# Task 3 outputs
+
+## duke_teco_pair_features.csv
+
+The Task 2 candidate-pair file with geographic and temporal features appended.
+Same 160 rows, same `pair_id`s, nothing from Task 2 changed - only new columns
+added. Built by `scripts/build_pair_features.py` from `analysis/geographic.py`
+and `analysis/temporal.py`.
+
+**Raw measurements always sit next to the derived score.** Never read
+`geographic_score` or `temporal_score` alone - `minimum_endpoint_distance_miles`
+and `schedule_overlap_months` / `year_difference` are what a judge can verify.
+
+### Geographic columns
+
+| column | meaning |
+|---|---|
+| `geography_available` | can this pair be measured at all |
+| `geography_point_count_a/b` | 0, 1, or 2 - how many endpoints each side has |
+| `minimum_endpoint_distance_miles` | smallest of up to 4 cross-project endpoint distances |
+| `project_a_nearest_endpoint` / `project_b_nearest_endpoint` | which endpoint (`origin`/`destination`) produced that minimum |
+| `pair_geography_confidence` | HIGH/MEDIUM/UNKNOWN, derived from both projects' own confidence - never overwrites them |
+| `geographic_score` | 0-100 heuristic, `null` when `geography_available` is false |
+| `geographic_reason` | one sentence, generated only from the calculated values |
+
+`minimum_endpoint_distance_miles` is the distance between known **endpoints**,
+not a transmission route. Read it as "known project endpoints are ~X miles
+apart," never "the lines are X miles apart."
+
+Scoring rule (PROJECT_SPEC gives descriptive bands, not 0-100 numbers - this is
+Task 3's own prototype heuristic, centralized in
+`analysis/geographic.GEOGRAPHIC_SCORE_THRESHOLDS`):
+
+```
+<= 10 mi -> 100      <= 25 mi -> 80      <= 50 mi -> 50      <= 100 mi -> 20      > 100 mi -> 0
+```
+
+Coverage: 50/160 pairs have geography on both sides (matches Task 2's count).
+Of those, distance ranges 6.0-190.5 miles, median ~67. 110 pairs are `null`,
+not zero - a TECO project with no located substation was never assumed to be
+"far away," it's simply unmeasured.
+
+### Temporal columns
+
+| column | meaning |
+|---|---|
+| `temporal_data_available` | can this pair's timing be compared at all |
+| `temporal_precision` | `month` \| `year` \| `mixed` \| `unknown` |
+| `schedule_overlap` / `schedule_overlap_months` | only set at `month` precision |
+| `same_active_year` / `year_difference` | only set at `year`/`mixed` precision |
+| `temporal_score` | 0-100 heuristic, `null` when data is unavailable |
+| `temporal_reason` | one sentence, matched to the precision actually used |
+
+**Important:** Duke only ever has an estimated in-service year, never a month
+or day. So in this dataset, `temporal_precision` is only ever `mixed` (144
+pairs - Duke has a year, TECO has month dates) or `unknown` (16 pairs - Duke's
+`P0017` has no year at all). The `month`/`year` tiers and the exact overlap
+logic (`schedule_overlap_months`) are implemented and unit-tested against
+synthetic dates in `tests/test_temporal.py`, but **do not fire on any real row
+right now** - there's no pair where both sides have month-level dates. If Duke
+data ever gains month precision, or a third utility with month-level dates is
+added, the same code handles it without changes.
+
+Mixed/year-precision scores are capped at 80, never 100 - reaching "same year"
+compatibility is not treated as equal to a verified 6-month overlap. This is a
+deliberate rule (`analysis/temporal.py`, `YEAR_PROXIMITY_SCORE_*`), not an
+oversight: uncertain data should never outscore precise data.
+
+## Rebuilding Task 3
+
+```bash
+python scripts/build_pair_features.py
+python tests/test_geographic.py
+python tests/test_temporal.py
+python tests/test_pair_features_integrity.py
+```
