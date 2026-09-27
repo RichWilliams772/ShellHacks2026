@@ -38,7 +38,13 @@ export default function HeatmapLayer({ points }: Props) {
     // color the same redline used everywhere else for the one thing on the map that matters most.
     const gradient = { 0.2: "#c9cec6", 0.45: "#5b6472", 0.7: "#1b2230", 1: "#c8352b" };
     const layer = L.heatLayer(points, { radius: 30, blur: 20, max: 0.05, minOpacity: 0.05, maxZoom: 11, gradient }).addTo(map);
+    // leaflet.heat redraws on moveend, not on the resize invalidateSize emits.
+    const redraw = () => {
+      map.fire("moveend");
+    };
+    map.on("resize", redraw);
     return () => {
+      map.off("resize", redraw);
       map.removeLayer(layer);
     };
   }, [points, map]);

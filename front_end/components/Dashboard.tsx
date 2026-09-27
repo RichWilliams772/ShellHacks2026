@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import type { AnalyzeResponse, Project } from "@/lib/types";
 import { analyze } from "@/lib/api";
 import { API_URL, UTILITY_A, UTILITY_B, USE_MOCK } from "@/lib/config";
@@ -19,6 +19,16 @@ type Status = "idle" | "loading" | "ready" | "error";
 // "Analyze projects" always shows the real, ordered comparison it just asked for, whether
 // the answer came back instantly (mock) or took a couple of seconds (live backend).
 const MIN_LOADING_MS = 1150;
+const ANALYSIS_DEFAULT = 440;
+const ANALYSIS_MIN = 280;
+const MAP_MIN = 360;
+const DIVIDER = 12;
+const KEY_STEP = 24;
+
+function clampAnalysis(width: number, containerWidth: number) {
+  const max = Math.max(ANALYSIS_MIN, containerWidth - MAP_MIN - DIVIDER);
+  return Math.min(max, Math.max(ANALYSIS_MIN, Math.round(width)));
+}
 
 export default function Dashboard() {
   const [status, setStatus] = useState<Status>("idle");
@@ -27,6 +37,10 @@ export default function Dashboard() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const sideRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const dividerRef = useRef<HTMLDivElement>(null);
+  const [analysisWidth, setAnalysisWidth] = useState(ANALYSIS_DEFAULT);
+  const [analysisMax, setAnalysisMax] = useState(ANALYSIS_DEFAULT);
 
   async function runAnalysis() {
     setStatus("loading");
@@ -94,6 +108,72 @@ export default function Dashboard() {
     sideRef.current?.scrollTo({ top: 0 });
   }, [selectedId]);
 
+  function clampToMain(width: number) {
+    const container = mainRef.current?.clientWidth ?? 0;
+    if (container <= 0) return Math.max(ANALYSIS_MIN, Math.round(width));
+    return clampAnalysis(width, container);
+  }
+
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const measure = () => {
+      if (!window.matchMedia("(min-width: 1024px)").matches) return;
+      const max = Math.max(ANALYSIS_MIN, el.clientWidth - MAP_MIN - DIVIDER);
+      setAnalysisMax(max);
+      setAnalysisWidth((width) => clampAnalysis(width, el.clientWidth));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const analysisWidthFromPointer = useCallback((clientX: number) => {
+    const main = mainRef.current;
+    if (!main) return;
+    const rect = main.getBoundingClientRect();
+    setAnalysisWidth(clampAnalysis(rect.right - clientX - DIVIDER / 2, rect.width));
+  }, []);
+
+  useEffect(() => {
+    const el = dividerRef.current;
+    if (!el) return;
+    let pointerId: number | null = null;
+    const move = (event: globalThis.PointerEvent) => {
+      if (pointerId === null || event.pointerId !== pointerId) return;
+      analysisWidthFromPointer(event.clientX);
+    };
+    const up = (event: globalThis.PointerEvent) => {
+      if (pointerId === null || event.pointerId !== pointerId) return;
+      pointerId = null;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    const down = (event: globalThis.PointerEvent) => {
+      if (event.button !== 0) return;
+      pointerId = event.pointerId;
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    };
+    el.addEventListener("pointerdown", down);
+    return () => {
+      el.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [analysisWidthFromPointer]);
+
+  function onDividerKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      setAnalysisWidth((width) => clampToMain(width + KEY_STEP));
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      setAnalysisWidth((width) => clampToMain(width - KEY_STEP));
+    }
+  }
+
   function selectByProject(projectId: string) {
     const best = filtered.find((o) => o.project_a.id === projectId || o.project_b.id === projectId);
     if (best) setSelectedId(best.opportunity_id);
@@ -110,15 +190,40 @@ export default function Dashboard() {
         onAnalyze={runAnalysis}
       />
 
-      <main className="grid flex-1 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_440px]">
-        <MapPanel
-          projects={ready ? mapProjects : []}
-          selected={selected}
-          onSelectProject={selectByProject}
-          opportunities={ready ? filtered : []}
-        />
+      <main
+        ref={mainRef}
+        className="flex flex-1 flex-col lg:min-h-0 lg:flex-row"
+        style={{ "--gs-analysis": `${analysisWidth}px` } as CSSProperties}
+      >
+        <div className="min-w-0 lg:h-full lg:min-h-0 lg:min-w-[360px] lg:flex-1 lg:basis-0">
+          <MapPanel
+            projects={ready ? mapProjects : []}
+            selected={selected}
+            onSelectProject={selectByProject}
+            opportunities={ready ? filtered : []}
+          />
+        </div>
 
-        <aside className="flex flex-col border-t border-ink lg:min-h-0 lg:border-t-0 lg:border-l">
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the map and analysis panels. Left arrow widens the analysis panel."
+          aria-valuemin={ANALYSIS_MIN}
+          aria-valuemax={analysisMax}
+          aria-valuenow={analysisWidth}
+          aria-valuetext={`${analysisWidth} pixel analysis panel`}
+          tabIndex={0}
+          ref={dividerRef}
+          className="relative hidden w-3 shrink-0 cursor-col-resize touch-none select-none items-center justify-center bg-sheet lg:flex"
+          onKeyDown={onDividerKeyDown}
+        >
+          <span aria-hidden className="h-12 w-px bg-ink" />
+        </div>
+
+        <aside
+          className="flex flex-col border-t border-ink lg:min-h-0 lg:w-[var(--gs-analysis)] lg:shrink-0 lg:border-t-0 lg:border-l"
+          data-analysis-width={analysisWidth}
+        >
           <div ref={sideRef} className="min-h-0 flex-1 lg:overflow-y-auto">
           {status === "idle" && (
             <p className="px-4 py-6 text-graphite">
