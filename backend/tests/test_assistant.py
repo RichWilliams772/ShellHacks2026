@@ -103,19 +103,19 @@ def test_assistant_answers_from_structured_results() -> None:
         assert int(opportunity["project_b"]["end_date"][:4]) < 2030
 
 
-def test_assistant_does_not_invent_savings_and_core_api_ignores_llm_key(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("GRIDSYNC_LLM_API_KEY", "test-key")
-    refused = client.post(
+def test_savings_question_is_not_hard_blocked() -> None:
+    """Savings questions used to short-circuit before reaching any analysis. Now
+    they flow through like any other question - the structured fallback still
+    never invents a dollar figure, since nothing in the record has one."""
+    response = client.post(
         "/assistant/query",
         json={"query": "What savings and ROI should we expect?"},
     )
-    body = refused.json()
-    assert body["opportunities"] == []
+    body = response.json()
+    assert response.status_code == 200
     assert body["llm_used"] is False
-    assert body["llm_configured"] is True
-    assert "does not calculate savings" in body["answer"]
+    assert body["llm_configured"] is False
+    assert body["opportunities"]
     assert "$" not in body["answer"]
     health = client.get("/health")
     assert health.status_code == 200
