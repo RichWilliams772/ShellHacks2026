@@ -34,7 +34,10 @@ export default function HeatmapLayer({ points }: Props) {
     // elsewhere in this file's sibling ProjectMap.tsx, not a new constant - and calibrating max
     // to the resulting single-point range (~0.004-0.04 at zoom 7) keeps the true top score close
     // to full intensity while leaving headroom for genuine clusters to read hotter still.
-    const layer = L.heatLayer(points, { radius: 30, blur: 20, max: 0.05, minOpacity: 0.05, maxZoom: 11 }).addTo(map);
+    // The site's own palette, not leaflet.heat's default rainbow - keeps the heatmap's "hottest"
+    // color the same redline used everywhere else for the one thing on the map that matters most.
+    const gradient = { 0.2: "#c9cec6", 0.45: "#5b6472", 0.7: "#1b2230", 1: "#c8352b" };
+    const layer = L.heatLayer(points, { radius: 30, blur: 20, max: 0.05, minOpacity: 0.05, maxZoom: 11, gradient }).addTo(map);
     return () => {
       map.removeLayer(layer);
     };

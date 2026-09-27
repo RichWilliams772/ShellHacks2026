@@ -111,6 +111,12 @@ export interface AssistantQuery {
   opportunity_id?: string;
 }
 
+/** One cited PDF page. Only present when the answer actually used it. */
+export interface AssistantSource {
+  document_title: string;
+  page: number;
+}
+
 /** Fields the chat displays. Scores and resources stay in the analysis response. */
 export interface AssistantResponse {
   assistant_mode: "structured_retrieval";
@@ -118,4 +124,5 @@ export interface AssistantResponse {
   llm_configured: boolean;
   answer: string;
   note: string;
+  sources: AssistantSource[];
 }

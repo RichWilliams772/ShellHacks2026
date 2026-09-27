@@ -49,13 +49,19 @@ export default function OpportunityList({ opportunities, onSelect, total, onRese
             ? humanize(o.project_a.project_type)
             : `${humanize(o.project_a.project_type)} and ${humanize(o.project_b.project_type)}`;
         return (
-          <li key={o.opportunity_id} className="border-b border-rule">
+          <li key={o.opportunity_id} className="group relative border-b border-rule">
+            <span
+              aria-hidden
+              className="absolute inset-y-0 left-0 w-[3px] scale-y-0 bg-ink transition-transform duration-150 group-hover:scale-y-100 group-focus-visible:scale-y-100"
+            />
             <button
               type="button"
               onClick={() => onSelect(o.opportunity_id)}
-              className="grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-3 text-left hover:bg-sheet"
+              className="no-press-scale grid w-full grid-cols-[2.25rem_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-3 text-left hover:bg-sheet active:bg-rule"
             >
-              <span className="font-display text-lg leading-6 font-semibold text-graphite">{a.opportunity_rank}</span>
+              <span className="mt-0.5 grid h-7 w-7 place-items-center rounded-md border border-graphite font-display text-sm leading-none font-semibold text-graphite group-hover:border-ink group-hover:text-ink">
+                {a.opportunity_rank}
+              </span>
               <span className="min-w-0 space-y-0.5">
                 <ProjectLine p={o.project_a} />
                 <ProjectLine p={o.project_b} />

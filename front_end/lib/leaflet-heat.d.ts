@@ -8,6 +8,7 @@ declare module "leaflet" {
     max?: number;
     minOpacity?: number;
     maxZoom?: number;
+    gradient?: Record<number, string>;
   }
   function heatLayer(
     points: Array<[number, number, number]>,

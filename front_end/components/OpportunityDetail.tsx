@@ -14,13 +14,22 @@ import {
   utilityColor,
   utilityShape,
 } from "@/lib/format";
-import ScoreBadge from "./ScoreBadge";
+import ScoreGauge from "./ScoreGauge";
 import InfoTip from "./InfoTip";
 import UtilityMarker from "./UtilityMarker";
-import CopyBriefButton from "./CopyBriefButton";
+import DownloadBriefButton from "./DownloadBriefButton";
 
+// A section break drawn like a detail callout on a technical drawing - a corner bracket and a
+// leader rule - rather than a plain heading or another bordered card. The same corner-bracket
+// device shows up at page scale (see CornerMarks in layout.tsx), so the two read as one idea.
 function Heading({ children }: { children: React.ReactNode }) {
-  return <h3 className="mt-6 mb-2 font-display text-xl font-semibold">{children}</h3>;
+  return (
+    <div className="mt-8 mb-3 flex items-center gap-2.5">
+      <span aria-hidden className="h-3 w-3 shrink-0 border-t-2 border-l-2 border-ink" />
+      <h3 className="font-display text-xl font-semibold whitespace-nowrap">{children}</h3>
+      <span aria-hidden className="h-px flex-1 bg-rule" />
+    </div>
+  );
 }
 
 function Row({ label, value, help }: { label: string; value: string; help?: string }) {
@@ -44,7 +53,10 @@ function Bar({ label, value }: { label: string; value: number | null }) {
         <span>{label}</span>
         <span className="font-semibold">{Math.round(value)}</span>
       </div>
-      <div className="mt-1 h-1.5 bg-rule">
+      <div
+        className="mt-1 h-1.5"
+        style={{ background: "repeating-linear-gradient(90deg, var(--color-graphite) 0 1px, transparent 1px 25%), var(--color-rule)" }}
+      >
         <div className="h-full bg-ink" style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
       </div>
     </div>
@@ -105,9 +117,9 @@ export default function OpportunityDetail({ o, onBack }: { o: Opportunity; onBac
     <article className="px-4 pt-3 pb-8">
       <div className="flex items-center justify-between gap-3">
         <button type="button" onClick={onBack} className="text-graphite underline hover:text-ink">
-          Back to all pairs
+          ‹ Back to all pairs
         </button>
-        <CopyBriefButton key={o.opportunity_id} o={o} />
+        <DownloadBriefButton key={o.opportunity_id} o={o} />
       </div>
 
       <div className="mt-4 flex items-end justify-between gap-4">
@@ -117,12 +129,12 @@ export default function OpportunityDetail({ o, onBack }: { o: Opportunity; onBac
             Coordination score
             <InfoTip text={SCORE_HELP} />
           </p>
+          {a.score_confidence && (
+            <p className="mt-1 text-sm text-graphite">{humanize(a.score_confidence.toLowerCase())} confidence in the inputs</p>
+          )}
         </div>
-        <ScoreBadge score={a.coordination_score} size="lg" />
+        <ScoreGauge score={a.coordination_score} />
       </div>
-      {a.score_confidence && (
-        <p className="mt-1 text-right text-sm text-graphite">{humanize(a.score_confidence.toLowerCase())} confidence in the inputs</p>
-      )}
 
       <h2 className="mt-4 font-display text-2xl leading-tight font-semibold">
         {o.project_a.name}
