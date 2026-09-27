@@ -83,20 +83,6 @@ function FitToProjects({ projects }: { projects: Project[] }) {
   return null;
 }
 
-// The desktop divider changes the map's width without remounting Leaflet.
-function SyncMapSize() {
-  const map = useMap();
-  useEffect(() => {
-    const container = map.getContainer();
-    const observer = new ResizeObserver(() => {
-      map.invalidateSize({ animate: false, pan: false });
-    });
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [map]);
-  return null;
-}
-
 function FitToSelection({ selected }: { selected: Opportunity | null }) {
   const map = useMap();
   useEffect(() => {
@@ -129,7 +115,6 @@ export default function ProjectMap({ projects, selected, onSelectProject, mode =
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <SyncMapSize />
       <FitToProjects projects={projects} />
       {mode === "map" && <FitToSelection selected={selected} />}
 

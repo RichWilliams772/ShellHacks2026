@@ -1,88 +1,38 @@
 @import "tailwindcss";
 
-/* Dark operations surface. Cyan, blue, and violet are interface accents.
-   Duke and TECO keep their own marker colors. The map tiles stay undimmed. */
+/* "Planning sheet": drafting film, ink, and one redline for the selected pair. */
 @theme inline {
-  --color-paper: #070b14;
-  --color-sheet: #10182a;
-  --color-ink: #f7f8fb;
-  --color-graphite: #a8b3c7;
-  --color-rule: #2a3650;
+  --color-paper: #edefea; /* drafting film */
+  --color-sheet: #f7f8f5; /* raised surfaces: title block, side column */
+  --color-ink: #1b2230;
+  --color-graphite: #5b6472;
+  --color-rule: #c9cec6; /* hairlines */
   --color-duke: #2456b8;
   --color-teco: #e08a12;
-  --color-redline: #7c3aed; /* selected pair only */
-  --color-cyan: #22d3ee;
-  --color-violet: #a78bfa;
+  --color-redline: #c8352b; /* only the selected pair and its distance */
   --font-sans: var(--font-barlow), system-ui, sans-serif;
   --font-display: var(--font-barlow-condensed), var(--font-barlow), system-ui, sans-serif;
 }
 
 body {
-  background-color: var(--color-paper);
-  background-image:
-    linear-gradient(rgba(56, 189, 248, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56, 189, 248, 0.045) 1px, transparent 1px);
-  background-size: 56px 56px;
+  background: var(--color-paper);
   color: var(--color-ink);
-  color-scheme: dark;
   font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-cyan);
+  outline: 2px solid var(--color-redline);
   outline-offset: 2px;
 }
 
-/* Header motif: a CSS grid and a few nodes. No external artwork. */
-.gs-network {
-  background-color: #0b1220;
-  background-image:
-    radial-gradient(circle at 78% 32%, rgba(34, 211, 238, 0.2), transparent 28%),
-    radial-gradient(circle at 92% 78%, rgba(167, 139, 250, 0.22), transparent 26%),
-    radial-gradient(1.5px 1.5px at 68% 28%, rgba(125, 211, 252, 0.95), transparent),
-    radial-gradient(1.5px 1.5px at 76% 62%, rgba(196, 181, 253, 0.95), transparent),
-    radial-gradient(1.5px 1.5px at 88% 40%, rgba(96, 165, 250, 0.95), transparent),
-    radial-gradient(1.5px 1.5px at 84% 74%, rgba(34, 211, 238, 0.9), transparent),
-    linear-gradient(118deg, transparent 66%, rgba(34, 211, 238, 0.45) 66.15%, transparent 66.4%),
-    linear-gradient(148deg, transparent 72%, rgba(167, 139, 250, 0.4) 72.15%, transparent 72.45%),
-    linear-gradient(rgba(148, 163, 184, 0.16) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.16) 1px, transparent 1px);
-  background-size: auto, auto, auto, auto, auto, auto, auto, auto, 42px 42px, 42px 42px;
-}
+/* Keep Leaflet panes below the page's overlay UI and in the page's type. */
+.leaflet-container { font: inherit; z-index: 0; background: var(--color-paper); }
 
-/* Stay visible while the brief endpoint is absent. A real download uses the wait cursor. */
-.gs-pdf:disabled {
-  opacity: 1;
-}
-.gs-pdf:disabled[data-loading="false"] {
-  cursor: default;
-}
+/* Grey the basemap so the utility colors and the redline carry the meaning. */
+.leaflet-tile-pane { filter: grayscale(1) contrast(0.85) brightness(1.08); }
 
-.gs-split:focus-visible {
-  outline: 2px solid var(--color-cyan);
-  outline-offset: -2px;
-}
-
-/* Leaflet stays a light geographic surface. Do not darken the tiles. */
-.leaflet-container {
-  font: inherit;
-  z-index: 0;
-  background: #d5dde6;
-}
-
-.leaflet-control-attribution {
-  max-width: min(46vw, 16rem);
-  background: rgba(247, 248, 245, 0.92);
-  color: #1b2230;
-  white-space: normal;
-}
-
-.leaflet-control-attribution a {
-  color: #1d4ed8;
-}
-
-/* The distance label on the selected pair. */
+/* The distance label on the redline dimension. */
 .dimension-label.leaflet-tooltip {
   background: var(--color-redline);
   color: #fff;
@@ -94,23 +44,4 @@ body {
   font-weight: 600;
   padding: 1px 8px;
 }
-.dimension-label.leaflet-tooltip::before {
-  display: none;
-}
-
-/* Phone map chrome. sm (640px) and up keeps the desktop/iPad control placement. */
-@media (max-width: 639px) {
-  .gs-map .leaflet-container.leaflet-touch .leaflet-bar a {
-    width: 44px;
-    height: 44px;
-    line-height: 44px;
-    font-size: 20px;
-  }
-
-  .gs-map .leaflet-control-attribution {
-    max-width: min(40vw, 8.5rem);
-    margin-bottom: 0;
-    font-size: 10px;
-    line-height: 1.25;
-  }
-}
+.dimension-label.leaflet-tooltip::before { display: none; }

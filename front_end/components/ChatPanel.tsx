@@ -2,13 +2,11 @@
 
 import { useState } from "react";
 import { askAssistant } from "@/lib/api";
-import { splitChatAnswer } from "@/lib/chatAnswer";
 import { UTILITY_A, UTILITY_B } from "@/lib/config";
 import type { AssistantMessage } from "@/lib/types";
 
 interface Props {
   opportunityId: string | null;
-  docked?: boolean;
 }
 
 interface Failure {
@@ -16,37 +14,11 @@ interface Failure {
   message: string;
 }
 
-function AssistantAnswer({ content }: { content: string }) {
-  const blocks = splitChatAnswer(content);
-  return (
-    <div className="text-sm [overflow-wrap:anywhere]">
-      {blocks.map((block, index) => {
-        const lead = index === 0;
-        if (block.kind === "heading") {
-          return (
-            <div key={index}>
-              {lead && <p className="font-semibold">GridSync:</p>}
-              <h3 className={`${lead ? "mt-1" : "mt-3"} font-display text-base font-semibold`}>{block.text}</h3>
-            </div>
-          );
-        }
-        return (
-          <p key={index} className={`${lead ? "" : "mt-1"} whitespace-pre-wrap`}>
-            {lead && <span className="font-semibold">GridSync: </span>}
-            {block.text}
-          </p>
-        );
-      })}
-    </div>
-  );
-}
-
-export default function ChatPanel({ opportunityId, docked = false }: Props) {
+export default function ChatPanel({ opportunityId }: Props) {
   const [turns, setTurns] = useState<AssistantMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
-  const [open, setOpen] = useState(false);
 
   async function send(query: string) {
     const text = query.trim();
@@ -79,44 +51,26 @@ export default function ChatPanel({ opportunityId, docked = false }: Props) {
   }
 
   return (
-    <section
-      className={`shrink-0 border-t border-rule bg-sheet ${docked ? "lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:border-t-0" : ""}`}
-      aria-label="Analysis chat"
-    >
-      <h2 className="hidden shrink-0 px-4 pt-3 font-display text-lg font-semibold sm:block">Ask about the analysis</h2>
-      <button
-        type="button"
-        className="flex min-h-11 w-full shrink-0 items-center justify-between gap-3 px-4 py-3 text-left font-display text-lg font-semibold sm:hidden"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        Ask about the analysis
-        <span className="text-sm font-semibold text-cyan">{open ? "Hide" : "Show"}</span>
-      </button>
-      <div className={`${open ? "flex flex-col" : "hidden sm:block"} ${docked ? "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" : ""}`}>
-      <p className="shrink-0 px-4 text-sm text-graphite sm:pt-0">
-        {opportunityId
-          ? "This conversation is only about the open pair."
-          : "This conversation is about the ranked pairs, not one open card."}
-      </p>
+    <section className="shrink-0 border-t border-ink bg-sheet" aria-label="Analysis chat">
+      <div className="px-4 pt-3">
+        <h2 className="font-display text-lg font-semibold">Ask about the analysis</h2>
+        <p className="text-sm text-graphite">
+          {opportunityId
+            ? "This conversation is only about the open pair."
+            : "This conversation is about the ranked pairs, not one open card."}
+        </p>
+      </div>
 
-      <div
-        className={`max-h-none space-y-3 overflow-visible px-4 py-3 break-words sm:max-h-44 sm:overflow-y-auto ${docked ? "lg:max-h-none lg:min-h-0 lg:flex-1 lg:overflow-y-auto" : ""}`}
-        aria-live="polite"
-      >
+      <div className="max-h-44 space-y-3 overflow-y-auto px-4 py-3" aria-live="polite">
         {turns.length === 0 && !pending && !failure && (
           <p className="text-sm text-graphite">Answers come from the analysis record. The chat does not rescore pairs.</p>
         )}
-        {turns.map((turn, index) =>
-          turn.role === "user" ? (
-            <p key={`${turn.role}-${index}`} className="text-sm whitespace-pre-wrap [overflow-wrap:anywhere]">
-              <span className="font-semibold">You: </span>
-              {turn.content}
-            </p>
-          ) : (
-            <AssistantAnswer key={`${turn.role}-${index}`} content={turn.content} />
-          ),
-        )}
+        {turns.map((turn, index) => (
+          <p key={`${turn.role}-${index}`} className="whitespace-pre-wrap text-sm">
+            <span className="font-semibold">{turn.role === "user" ? "You" : "GridSync"}: </span>
+            {turn.content}
+          </p>
+        ))}
         {pending && (
           <p className="text-sm" role="status">
             <span className="font-semibold">You: </span>
@@ -135,7 +89,7 @@ export default function ChatPanel({ opportunityId, docked = false }: Props) {
       </div>
 
       <form
-        className="flex shrink-0 gap-2 border-t border-rule px-4 py-3"
+        className="flex gap-2 border-t border-rule px-4 py-3"
         onSubmit={(event) => {
           event.preventDefault();
           void send(draft);
@@ -151,17 +105,16 @@ export default function ChatPanel({ opportunityId, docked = false }: Props) {
           disabled={pending !== null}
           onChange={(event) => setDraft(event.target.value)}
           placeholder={opportunityId ? "Why did this pair match?" : "Which pairs are strongest?"}
-          className="min-h-11 min-w-0 flex-1 rounded-full border border-rule bg-paper px-3 py-1.5 text-sm text-ink disabled:opacity-60 sm:min-h-0"
+          className="min-w-0 flex-1 rounded-sm border border-rule bg-paper px-2 py-1.5 text-sm disabled:opacity-60"
         />
         <button
           type="submit"
           disabled={pending !== null || draft.trim() === ""}
-          className="min-h-11 shrink-0 rounded-full bg-cyan px-4 py-1.5 font-display font-semibold text-paper disabled:cursor-wait disabled:opacity-60 sm:min-h-0 sm:px-3"
+          className="rounded-sm bg-ink px-3 py-1.5 font-display font-semibold text-paper disabled:cursor-wait disabled:opacity-60"
         >
           {pending ? "Asking…" : "Ask"}
         </button>
       </form>
-      </div>
     </section>
   );
 }

@@ -5,7 +5,6 @@ import type {
   AssistantQuery,
   AssistantResponse,
   Opportunity,
-  ScenarioOutcome,
   Project,
   SharedResource,
 } from "./types";
@@ -234,78 +233,6 @@ export async function analyze(body: AnalyzeRequest): Promise<{ data: AnalyzeResp
     console.error("GridSync: live analysis failed, showing saved results instead.", e);
     return { data: snapshot as AnalyzeResponse, source: "fallback" };
   }
-}
-
-/** GET /opportunities/{opportunity_id}/brief.pdf is served by the analysis API. */
-export const PDF_BRIEF_AVAILABLE = true;
-
-function pdfFilename(opportunityId: string) {
-  return `GridSync-${opportunityId}.pdf`;
-}
-
-function isPdf(bytes: Uint8Array, contentType: string) {
-  const type = contentType.toLowerCase();
-  const header = String.fromCharCode(...bytes.subarray(0, 5));
-  return type.includes("application/pdf") && header === "%PDF-";
-}
-
-/** Download Aaron's brief for one pair. Does not build a PDF in the browser. */
-export async function downloadOpportunityBrief(opportunityId: string): Promise<void> {
-  const id = encodeURIComponent(opportunityId);
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}/opportunities/${id}/brief.pdf`);
-  } catch {
-    throw new Error("Couldn't reach the analysis service. Check that the backend is running, then try again.");
-  }
-  if (res.status === 404) throw new Error("That pair is not in the current analysis.");
-  if (res.status !== 200) throw new Error(`The PDF brief could not be downloaded (HTTP ${res.status}).`);
-  const bytes = new Uint8Array(await res.arrayBuffer());
-  if (!isPdf(bytes, res.headers.get("content-type") ?? "")) {
-    throw new Error("The analysis service did not return a PDF brief.");
-  }
-  const blob = new Blob([bytes], { type: "application/pdf" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = pdfFilename(opportunityId);
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-
-export async function runScenario(
-  opportunityId: string,
-  projectId: string,
-  change: { shiftMonths?: number; inServiceYear?: number },
-): Promise<ScenarioOutcome> {
-  const id = encodeURIComponent(opportunityId);
-  const body: { project_id: string; shift_months?: number; in_service_year?: number } = {
-    project_id: projectId,
-  };
-  if (change.shiftMonths != null) body.shift_months = change.shiftMonths;
-  if (change.inServiceYear != null) body.in_service_year = change.inServiceYear;
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}/opportunities/${id}/scenario`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  } catch {
-    throw new Error("Couldn't reach the analysis service. Check that the backend is running, then try again.");
-  }
-  const raw: unknown = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(assistantError(res.status, raw));
-  if (!raw || typeof raw !== "object" || !("scenario" in raw)) {
-    throw new Error("The scenario response had no result.");
-  }
-  const scenario = (raw as { scenario: unknown }).scenario;
-  if (!scenario || typeof scenario !== "object") {
-    throw new Error("The scenario response had no result.");
-  }
-  return scenario as ScenarioOutcome;
 }
 
 function assistantError(status: number, body: unknown): string {

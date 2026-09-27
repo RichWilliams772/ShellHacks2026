@@ -5,5 +5,3 @@ __pycache__/
 .ruff_cache/
 *.pyc
 *.egg-info/
-
-.env.local

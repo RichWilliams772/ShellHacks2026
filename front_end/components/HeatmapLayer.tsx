@@ -35,13 +35,7 @@ export default function HeatmapLayer({ points }: Props) {
     // to the resulting single-point range (~0.004-0.04 at zoom 7) keeps the true top score close
     // to full intensity while leaving headroom for genuine clusters to read hotter still.
     const layer = L.heatLayer(points, { radius: 30, blur: 20, max: 0.05, minOpacity: 0.05, maxZoom: 11 }).addTo(map);
-    // leaflet.heat redraws on moveend, not on the resize invalidateSize emits.
-    const redraw = () => {
-      map.fire("moveend");
-    };
-    map.on("resize", redraw);
     return () => {
-      map.off("resize", redraw);
       map.removeLayer(layer);
     };
   }, [points, map]);

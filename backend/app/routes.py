@@ -5,16 +5,13 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import Response
 
-from app.assistant import answer_query, answer_scenario_question, is_scenario_question
-from app.brief_pdf import render_coordination_brief
+from app.assistant import answer_query
 from app.config import SCORE_INTERPRETATION
 from app.errors import (
     OpportunityNotFoundError,
     ProjectNotFoundError,
     SameUtilityError,
-    ScenarioRejected,
     UnknownUtilityError,
 )
 from app.filters import OpportunityFilters
@@ -27,11 +24,8 @@ from app.models import (
     OpportunityResponse,
     ProjectListResponse,
     ProjectResponse,
-    ScenarioRequest,
-    ScenarioResponse,
     UtilityListResponse,
 )
-from app.scenario import run_scenario
 from app.service import AnalysisService
 
 router = APIRouter()
@@ -143,50 +137,6 @@ def opportunities(
     )
 
 
-@router.get("/opportunities/{opportunity_id}/brief.pdf")
-def opportunity_brief(opportunity_id: str, request: Request) -> Response:
-    service = _service(request)
-    try:
-        opportunity = service.get_opportunity(opportunity_id)
-    except OpportunityNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    filename = f"GridSync-{opportunity.id}.pdf"
-    return Response(
-        content=render_coordination_brief(opportunity),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
-
-
-@router.post("/opportunities/{opportunity_id}/scenario", response_model=ScenarioResponse)
-def opportunity_scenario(
-    opportunity_id: str,
-    body: ScenarioRequest,
-    request: Request,
-) -> ScenarioResponse:
-    service = _service(request)
-    try:
-        opportunity = service.get_opportunity(opportunity_id)
-        scenario = run_scenario(
-            opportunity,
-            body.project_id,
-            shift_months=body.shift_months,
-            in_service_year=body.in_service_year,
-        )
-    except OpportunityNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ScenarioRejected as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    envelope = service.envelope()
-    return ScenarioResponse(
-        dataset_status=envelope.dataset_status,
-        data_notice=envelope.data_notice,
-        contains_demo_data=envelope.contains_demo_data,
-        contains_verified_public_data=envelope.contains_verified_public_data,
-        scenario=scenario,
-    )
-
-
 @router.get("/opportunities/{opportunity_id}", response_model=OpportunityResponse)
 def opportunity_detail(opportunity_id: str, request: Request) -> OpportunityResponse:
     service = _service(request)
@@ -233,22 +183,13 @@ def assistant_query(body: AssistantQuery, request: Request) -> AssistantResponse
     else:
         left, right = _utility_pair(service, body.utility_a, body.utility_b)
         catalog = _analyze(service, left, right, OpportunityFilters()).opportunities
-    client = getattr(request.app.state, "llm_client", None)
-    if focus_id and is_scenario_question(body.query):
-        result = answer_scenario_question(
-            body.query,
-            catalog[0],
-            client=client,
-            history=body.messages,
-        )
-    else:
-        result = answer_query(
-            body.query,
-            catalog,
-            client=client,
-            history=body.messages,
-            focus_id=focus_id,
-        )
+    result = answer_query(
+        body.query,
+        catalog,
+        client=getattr(request.app.state, "llm_client", None),
+        history=body.messages,
+        focus_id=focus_id,
+    )
     envelope = service.envelope()
     return AssistantResponse(
         dataset_status=envelope.dataset_status,
@@ -262,7 +203,6 @@ def assistant_query(body: AssistantQuery, request: Request) -> AssistantResponse
         note=result.note,
         filters_applied=result.filters_applied,
         opportunities=result.opportunities,
-        scenario=result.scenario,
     )
 
 

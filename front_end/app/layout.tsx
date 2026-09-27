@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import { Barlow, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 
@@ -18,12 +18,6 @@ const barlowCondensed = Barlow_Condensed({
 export const metadata: Metadata = {
   title: "GridSync",
   description: "Find where the grid can build together.",
-};
-
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

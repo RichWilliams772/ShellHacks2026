@@ -119,39 +119,3 @@ export interface AssistantResponse {
   answer: string;
   note: string;
 }
-
-export interface ScenarioTiming {
-  temporal_score: number | null;
-  temporal_precision: string | null;
-  schedule_overlap_months: number | null;
-  year_difference: number | null;
-  same_active_year: boolean | null;
-  temporal_reason: string | null;
-}
-
-/** POST /opportunities/{id}/scenario. Scores are copied from the analysis service. */
-export interface ScenarioOutcome {
-  opportunity_id: string;
-  hypothetical_only: true;
-  notice: string;
-  assumption: string;
-  shift_months: number | null;
-  dates: {
-    project_id: string;
-    project_name: string;
-    original_start_date: string | null;
-    scenario_start_date: string | null;
-    end_date: string | null;
-    published_in_service_year: number | null;
-    hypothetical_in_service_year: number | null;
-  };
-  baseline_coordination_score: number | null;
-  scenario_coordination_score: number | null;
-  coordination_score_change: number | null;
-  baseline_temporal: ScenarioTiming;
-  scenario_temporal: ScenarioTiming;
-  temporal_score_change: number | null;
-  explanation: string;
-  limitations: string[];
-  score_unavailable_reason: string | null;
-}

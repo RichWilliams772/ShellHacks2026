@@ -53,13 +53,13 @@ export default function OpportunityList({ opportunities, onSelect, total, onRese
             <button
               type="button"
               onClick={() => onSelect(o.opportunity_id)}
-              className="grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-3 text-left hover:bg-white/5"
+              className="grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-3 text-left hover:bg-sheet"
             >
               <span className="font-display text-lg leading-6 font-semibold text-graphite">{a.opportunity_rank}</span>
               <span className="min-w-0 space-y-0.5">
                 <ProjectLine p={o.project_a} />
                 <ProjectLine p={o.project_b} />
-                <span className="block pt-1 text-sm break-words text-graphite">{typeLabel}</span>
+                <span className="block pt-1 text-sm text-graphite">{typeLabel}</span>
                 <span className="block text-sm text-graphite">
                   {a.distance_miles == null ? "Distance not available" : `${fmtMiles(a.distance_miles)} apart`}
                   {gap !== NA && `, ${gap.toLowerCase()}`}

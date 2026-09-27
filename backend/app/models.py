@@ -452,65 +452,6 @@ class AssistantQuery(BaseModel):
         return value
 
 
-class ScenarioRequest(BaseModel):
-    """One hypothetical timing change for a project on an open pair."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    project_id: str = Field(min_length=1)
-    shift_months: int | None = Field(default=None, ge=-36, le=36)
-    in_service_year: int | None = Field(default=None, ge=1900, le=2200)
-
-    @model_validator(mode="after")
-    def _one_timing_change(self) -> ScenarioRequest:
-        if (self.shift_months is None) == (self.in_service_year is None):
-            raise ValueError("Provide either shift_months or in_service_year.")
-        return self
-
-
-class ScenarioTiming(BaseModel):
-    temporal_score: float | None
-    temporal_precision: str | None
-    schedule_overlap_months: float | None
-    year_difference: float | None
-    same_active_year: bool | None
-    temporal_reason: str | None
-
-
-class ScenarioDates(BaseModel):
-    project_id: str
-    project_name: str
-    original_start_date: str | None = None
-    scenario_start_date: str | None = None
-    end_date: str | None = None
-    published_in_service_year: int | None = None
-    hypothetical_in_service_year: int | None = None
-
-
-class ScenarioOutcome(BaseModel):
-    """Computed what-if result. Published project records are not included as edits."""
-
-    opportunity_id: str
-    hypothetical_only: Literal[True] = True
-    notice: str
-    assumption: str
-    shift_months: int | None = None
-    dates: ScenarioDates
-    baseline_coordination_score: float | None
-    scenario_coordination_score: float | None
-    coordination_score_change: float | None
-    baseline_temporal: ScenarioTiming
-    scenario_temporal: ScenarioTiming
-    temporal_score_change: float | None
-    explanation: str
-    limitations: list[str]
-    score_unavailable_reason: str | None = None
-
-
-class ScenarioResponse(DataEnvelope):
-    scenario: ScenarioOutcome
-
-
 class AssistantResponse(DataEnvelope):
     assistant_mode: Literal["structured_retrieval"]
     llm_used: bool
@@ -519,4 +460,3 @@ class AssistantResponse(DataEnvelope):
     note: str
     filters_applied: dict[str, Any]
     opportunities: list[Opportunity]
-    scenario: ScenarioOutcome | None = None
