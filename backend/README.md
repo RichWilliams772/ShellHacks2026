@@ -92,17 +92,17 @@ The loader does not check that a `public` row is actually a Duke or TECO filing.
 
 The model may explain those records, answer a follow-up, and describe the dashboard: choose the two utilities, run analysis, filter by year, project type, maximum endpoint distance, and minimum coordination score, then open a card or the map. It must not invent distances, dates, scores, resources, sources, savings, or a recommendation. `llm_used` is true only when that call returns text. With no API key, or if the provider fails, the response keeps the filtered opportunities and a structured answer, and `llm_used` is false.
 
-The chat call is one OpenAI-compatible chat completion. Gemini is configured with a Gemini API key, model `gemini-2.5-flash`, and base URL `https://generativelanguage.googleapis.com/v1beta/openai`. The client posts to `{base}/chat/completions` and verifies TLS with the `certifi` CA bundle. Do not commit the key.
+The chat call is one OpenAI-compatible chat completion. Gemini is configured with a Gemini API key, model `gemini-3.5-flash-lite`, and base URL `https://generativelanguage.googleapis.com/v1beta/openai`. The client posts to `{base}/chat/completions` and verifies TLS with the `certifi` CA bundle. Do not commit the key.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `GRIDSYNC_LLM_API_KEY` | yes, for a model call | Bearer token. Absent key returns the structured record and `llm_used: false`. |
-| `GRIDSYNC_LLM_MODEL` | no | Chat model. Gemini: `gemini-2.5-flash`. If unset, `gpt-4o-mini`. |
+| `GRIDSYNC_LLM_MODEL` | no | Chat model. Gemini: `gemini-3.5-flash-lite`. If unset, `gpt-4o-mini`. |
 | `GRIDSYNC_LLM_BASE_URL` | no | API origin without `/chat/completions`. Gemini: `https://generativelanguage.googleapis.com/v1beta/openai`. If unset, `https://api.openai.com/v1`. |
 
 ```bash
 export GRIDSYNC_LLM_API_KEY="your-gemini-key"
-export GRIDSYNC_LLM_MODEL="gemini-2.5-flash"
+export GRIDSYNC_LLM_MODEL="gemini-3.5-flash-lite"
 export GRIDSYNC_LLM_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai"
 
 curl -s -X POST http://127.0.0.1:8000/assistant/query \
