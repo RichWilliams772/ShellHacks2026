@@ -27,6 +27,15 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["app*"]
 
+# backend/app/main.py isn't one of Vercel's auto-scanned default entrypoint
+# locations (app.py/main.py/etc. at the repo root or one level into src/ or
+# app/) - the repo root has a backend/ prefix in front of it. This tells
+# Vercel exactly where the FastAPI `app` instance lives instead. Module path
+# matches this package's own name (see [tool.setuptools.packages.find]
+# above) and its own internal imports (e.g. `from app.config import ...`).
+[tool.vercel]
+entrypoint = "app.main:app"
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
