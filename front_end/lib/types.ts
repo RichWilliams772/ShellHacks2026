@@ -96,3 +96,26 @@ export interface AnalyzeRequest {
   utility_a: string;
   utility_b: string;
 }
+
+export interface AssistantMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/** POST /assistant/query. Omit opportunity_id when no card is open. */
+export interface AssistantQuery {
+  query: string;
+  messages: AssistantMessage[];
+  utility_a?: string;
+  utility_b?: string;
+  opportunity_id?: string;
+}
+
+/** Fields the chat displays. Scores and resources stay in the analysis response. */
+export interface AssistantResponse {
+  assistant_mode: "structured_retrieval";
+  llm_used: boolean;
+  llm_configured: boolean;
+  answer: string;
+  note: string;
+}

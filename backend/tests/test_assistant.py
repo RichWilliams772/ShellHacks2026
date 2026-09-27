@@ -11,6 +11,13 @@ from app.config import Settings
 from app.main import create_app
 
 client = TestClient(create_app(settings=Settings()))
+
+
+@pytest.fixture(autouse=True)
+def _no_live_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GRIDSYNC_LLM_API_KEY", raising=False)
+
+
 ASSISTANT_SOURCE = (
     Path(__file__).resolve().parents[1] / "app" / "assistant.py"
 ).read_text(encoding="utf-8")
@@ -64,7 +71,10 @@ def test_assistant_answers_from_structured_results() -> None:
         json={"query": "Why did GridSync match these projects?"},
     )
     top_reason = why.json()["opportunities"][0]["reasons"][0]
-    assert top_reason in why.json()["answer"]
+    answer = why.json()["answer"]
+    assert "Why it matched" in answer
+    assert "What's missing" in answer
+    assert top_reason.replace("_", " ") in answer or "Both projects involve" in answer
 
     resources = client.post(
         "/assistant/query",

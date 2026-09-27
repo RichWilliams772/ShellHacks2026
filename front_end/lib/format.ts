@@ -39,11 +39,24 @@ export function projectYears(p: Project): number[] {
   return p.in_service_year != null ? [p.in_service_year] : [];
 }
 
-// "transmission_upgrade" -> "Transmission upgrade"
+// "transmission_upgrade" -> "Transmission upgrade". Display only; filters keep the raw value.
 export function humanize(v: string | null | undefined) {
   if (!v) return NA;
   const s = v.replace(/_/g, " ");
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function phrase(type: string) {
+  const words = type.replace(/_/g, " ");
+  return words.endsWith("upgrade") ? `${words}s` : words;
+}
+
+// Evidence sentences keep their facts. Only snake_case labels change on screen.
+export function readableEvidence(text: string) {
+  const plain = text.replace(/\b[a-z]+(?:_[a-z0-9]+)+\b/g, (token) => token.replaceAll("_", " "));
+  const typed = plain.match(/^Both projects are (?:categorized as )?([a-z ]+)\.$/);
+  if (!typed) return plain;
+  return `Both projects involve ${phrase(typed[1].replaceAll(" ", "_"))}.`;
 }
 
 export function shortUtility(name: string) {

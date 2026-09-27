@@ -415,12 +415,41 @@ class OpportunityResponse(DataEnvelope):
     opportunity: Opportunity
 
 
+class AssistantTurn(BaseModel):
+    """One prior chat turn. The current question stays in query."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=2000)
+
+
 class AssistantQuery(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query: str = Field(min_length=1, max_length=1000)
     utility_a: str | None = None
     utility_b: str | None = None
+    opportunity_id: str | None = None
+    messages: list[AssistantTurn] = Field(default_factory=list)
+
+    @field_validator("opportunity_id", mode="before")
+    @classmethod
+    def _blank_opportunity_id(cls, value: object) -> object:
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("messages", mode="before")
+    @classmethod
+    def _recent_messages(cls, value: object) -> object:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return value[-8:]
+        return value
 
 
 class AssistantResponse(DataEnvelope):

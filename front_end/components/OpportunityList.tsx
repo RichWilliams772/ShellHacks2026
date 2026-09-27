@@ -1,7 +1,7 @@
 "use client";
 
 import type { Opportunity, Project } from "@/lib/types";
-import { fmtMiles, fmtScheduleGap, NA, utilityColor, utilityShape } from "@/lib/format";
+import { fmtMiles, fmtScheduleGap, humanize, NA, utilityColor, utilityShape } from "@/lib/format";
 import UtilityMarker from "./UtilityMarker";
 import ScoreBadge from "./ScoreBadge";
 
@@ -44,6 +44,10 @@ export default function OpportunityList({ opportunities, onSelect, total, onRese
       {opportunities.map((o) => {
         const a = o.analysis;
         const gap = fmtScheduleGap(a);
+        const typeLabel =
+          o.project_a.project_type === o.project_b.project_type
+            ? humanize(o.project_a.project_type)
+            : `${humanize(o.project_a.project_type)} and ${humanize(o.project_b.project_type)}`;
         return (
           <li key={o.opportunity_id} className="border-b border-rule">
             <button
@@ -55,7 +59,8 @@ export default function OpportunityList({ opportunities, onSelect, total, onRese
               <span className="min-w-0 space-y-0.5">
                 <ProjectLine p={o.project_a} />
                 <ProjectLine p={o.project_b} />
-                <span className="block pt-1 text-sm text-graphite">
+                <span className="block pt-1 text-sm text-graphite">{typeLabel}</span>
+                <span className="block text-sm text-graphite">
                   {a.distance_miles == null ? "Distance not available" : `${fmtMiles(a.distance_miles)} apart`}
                   {gap !== NA && `, ${gap.toLowerCase()}`}
                 </span>

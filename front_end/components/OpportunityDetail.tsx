@@ -10,6 +10,7 @@ import {
   fmtScheduleGap,
   geometryLabel,
   humanize,
+  readableEvidence,
   utilityColor,
   utilityShape,
 } from "@/lib/format";
@@ -142,7 +143,7 @@ export default function OpportunityDetail({ o, onBack }: { o: Opportunity; onBac
       {o.evidence.length > 0 ? (
         <ul className="list-disc space-y-1 pl-5">
           {o.evidence.map((e, i) => (
-            <li key={i}>{e}</li>
+            <li key={i}>{readableEvidence(e)}</li>
           ))}
         </ul>
       ) : (

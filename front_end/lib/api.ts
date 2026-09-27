@@ -1,5 +1,13 @@
 import { API_URL, USE_MOCK } from "./config";
-import type { AnalyzeRequest, AnalyzeResponse, Opportunity, Project, SharedResource } from "./types";
+import type {
+  AnalyzeRequest,
+  AnalyzeResponse,
+  AssistantQuery,
+  AssistantResponse,
+  Opportunity,
+  Project,
+  SharedResource,
+} from "./types";
 // Snapshot of analyze_projects("Duke Energy Florida", "Tampa Electric") — real public data.
 // Regenerate with the command in front_end/README.md after the data team updates the pipeline.
 import snapshot from "./mock/analyze.json";
@@ -14,13 +22,106 @@ export type ResultSource = "snapshot" | "live" | "fallback";
 // downstream keeps working against lib/types.ts unchanged. Nothing here computes a score,
 // distance, overlap, or resource — only renames/reshapes fields that already exist.
 
+type RawProject = {
+  id: string;
+  utility: string;
+  project_name: string;
+  project_type: string;
+  status?: string | null;
+  voltage_label?: string | null;
+  voltage_min_kv?: number | null;
+  voltage_kv?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  estimated_in_service_year?: number | null;
+  date_precision?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  from_latitude?: number | null;
+  from_longitude?: number | null;
+  to_latitude?: number | null;
+  to_longitude?: number | null;
+  geometry_type?: string | null;
+  location_confidence?: string | null;
+  source_name?: string | null;
+  source_url?: string | null;
+  geography_source?: string | null;
+  circuit_endpoint_source?: string | null;
+  form1_schedule?: string | null;
+};
+
+type RawResource = {
+  resource?: string;
+  name?: string;
+  label?: string;
+  potential?: string;
+  strength?: string;
+  evidence?: string[];
+  reason?: string;
+};
+
+type RawComponents = {
+  geography_available?: boolean;
+  geographic_score?: number | null;
+  temporal_score?: number | null;
+  text_similarity_score?: number | null;
+  infrastructure_similarity?: number | null;
+  score_confidence?: string | null;
+  opportunity_rank?: number;
+};
+
+type RawOpportunity = {
+  id: string;
+  project_a: RawProject;
+  project_b: RawProject;
+  published_components?: RawComponents | null;
+  features?: {
+    distance_miles?: number | null;
+    schedule_overlap_months?: number | null;
+    temporal_precision?: string | null;
+    year_difference?: number | null;
+    same_active_year?: boolean | null;
+  } | null;
+  coordination_score: number;
+  reasons?: string[];
+  coordination_package?: { resources?: RawResource[] } | null;
+  data_confidence?: Opportunity["data_confidence"] | null;
+};
+
+type RawAnalyzeResponse = {
+  utility_a: string;
+  utility_b: string;
+  projects_analyzed: number;
+  pairs_evaluated: number;
+  opportunity_count: number;
+  opportunities?: RawOpportunity[];
+};
+
+function asConfidence(value: string | null | undefined): Project["location_confidence"] {
+  if (value === "HIGH" || value === "MEDIUM" || value === "LOW" || value === "UNKNOWN") return value;
+  return null;
+}
+
+function asPotential(value: string | undefined): SharedResource["potential"] | null {
+  if (value === "HIGH" || value === "MEDIUM" || value === "LOW") return value;
+  return null;
+}
+
+function asDatePrecision(value: string | null | undefined): Project["date_precision"] {
+  return value === "month" || value === "year" ? value : null;
+}
+
+function asGeometry(value: string | null | undefined): Project["geometry_type"] {
+  return value === "approximate_corridor" || value === "point" ? value : null;
+}
+
 function voltageLabel(label: string | null, minKv: number | null, maxKv: number | null): string | null {
   if (label) return label;
   if (minKv == null || maxKv == null) return null;
   return minKv === maxKv ? `${minKv} kV` : `${minKv}-${maxKv} kV`;
 }
 
-function mapProject(raw: any): Project {
+function mapProject(raw: RawProject): Project {
   return {
     id: raw.id,
     utility: raw.utility,
@@ -31,15 +132,15 @@ function mapProject(raw: any): Project {
     start: raw.start_date ?? null,
     end: raw.end_date ?? null,
     in_service_year: raw.estimated_in_service_year ?? null,
-    date_precision: raw.date_precision ?? null,
+    date_precision: asDatePrecision(raw.date_precision),
     mid_lat: raw.latitude ?? null,
     mid_lon: raw.longitude ?? null,
     from_lat: raw.from_latitude ?? null,
     from_lon: raw.from_longitude ?? null,
     to_lat: raw.to_latitude ?? null,
     to_lon: raw.to_longitude ?? null,
-    geometry_type: raw.geometry_type ?? null,
-    location_confidence: raw.location_confidence ?? null,
+    geometry_type: asGeometry(raw.geometry_type),
+    location_confidence: asConfidence(raw.location_confidence),
     // Only a citation the project actually has — never a placeholder for one it doesn't.
     sources: {
       ...(raw.source_name ? { project_source: raw.source_name } : {}),
@@ -51,16 +152,18 @@ function mapProject(raw: any): Project {
   };
 }
 
-function mapResource(raw: any): SharedResource {
+function mapResource(raw: RawResource): SharedResource | null {
+  const potential = asPotential(raw.potential) ?? asPotential(raw.strength);
+  if (!potential) return null;
   return {
-    resource_id: raw.resource ?? raw.name,
-    display_name: raw.label,
-    potential: raw.potential ?? raw.strength,
+    resource_id: raw.resource ?? raw.name ?? raw.label ?? "resource",
+    display_name: raw.label ?? raw.name ?? raw.resource ?? "Resource",
+    potential,
     evidence: raw.evidence ?? (raw.reason ? [raw.reason] : []),
   };
 }
 
-function mapOpportunity(raw: any): Opportunity {
+function mapOpportunity(raw: RawOpportunity): Opportunity {
   const c = raw.published_components ?? {};
   const f = raw.features ?? {};
   return {
@@ -79,13 +182,16 @@ function mapOpportunity(raw: any): Opportunity {
       text_similarity_score: c.text_similarity_score ?? null,
       infrastructure_similarity: c.infrastructure_similarity ?? null,
       coordination_score: raw.coordination_score,
-      score_confidence: c.score_confidence ?? null,
-      opportunity_rank: c.opportunity_rank,
+      score_confidence: asConfidence(c.score_confidence),
+      opportunity_rank: c.opportunity_rank ?? 0,
     },
     evidence: raw.reasons ?? [],
     // coordination_package.resources carries full per-resource evidence lists;
     // .shared_resources only has a single collapsed string, so resources is preferred.
-    potential_shared_resources: (raw.coordination_package?.resources ?? []).map(mapResource),
+    potential_shared_resources: (raw.coordination_package?.resources ?? []).flatMap((item) => {
+      const mapped = mapResource(item);
+      return mapped ? [mapped] : [];
+    }),
     data_confidence: raw.data_confidence ?? {
       geography: null,
       temporal: null,
@@ -95,7 +201,7 @@ function mapOpportunity(raw: any): Opportunity {
   };
 }
 
-function mapAnalyzeResponse(raw: any): AnalyzeResponse {
+function mapAnalyzeResponse(raw: RawAnalyzeResponse): AnalyzeResponse {
   const opportunities = (raw.opportunities ?? []).map(mapOpportunity);
   return {
     summary: {
@@ -127,4 +233,56 @@ export async function analyze(body: AnalyzeRequest): Promise<{ data: AnalyzeResp
     console.error("GridSync: live analysis failed, showing saved results instead.", e);
     return { data: snapshot as AnalyzeResponse, source: "fallback" };
   }
+}
+
+function assistantError(status: number, body: unknown): string {
+  if (body && typeof body === "object" && "detail" in body) {
+    const detail = (body as { detail: unknown }).detail;
+    if (typeof detail === "string" && detail.trim()) return detail;
+  }
+  if (status === 404) return "That pair is not in the current analysis.";
+  return `The assistant could not answer (HTTP ${status}).`;
+}
+
+export async function askAssistant(body: AssistantQuery): Promise<AssistantResponse> {
+  const payload: AssistantQuery = {
+    query: body.query,
+    messages: body.messages,
+  };
+  if (body.utility_a && body.utility_b) {
+    payload.utility_a = body.utility_a;
+    payload.utility_b = body.utility_b;
+  }
+  if (body.opportunity_id) payload.opportunity_id = body.opportunity_id;
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/assistant/query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new Error("Couldn't reach the analysis service. Check that the backend is running, then try again.");
+  }
+
+  const raw: unknown = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(assistantError(res.status, raw));
+  if (!raw || typeof raw !== "object" || typeof (raw as { answer?: unknown }).answer !== "string") {
+    throw new Error("The assistant response had no answer.");
+  }
+  const record = raw as {
+    answer: string;
+    note?: unknown;
+    llm_used?: unknown;
+    llm_configured?: unknown;
+    assistant_mode?: unknown;
+  };
+  return {
+    assistant_mode: "structured_retrieval",
+    llm_used: record.llm_used === true,
+    llm_configured: record.llm_configured === true,
+    answer: record.answer,
+    note: typeof record.note === "string" ? record.note : "",
+  };
 }

@@ -10,6 +10,7 @@ import Filters, { ANY_DISTANCE, DEFAULT_FILTERS, type FilterState } from "./Filt
 import OpportunityList from "./OpportunityList";
 import OpportunityDetail from "./OpportunityDetail";
 import MapPanel from "./MapPanel";
+import ChatPanel from "./ChatPanel";
 
 type Status = "idle" | "loading" | "ready" | "error";
 
@@ -18,7 +19,7 @@ export default function Dashboard() {
   const [data, setData] = useState<AnalyzeResponse | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const sideRef = useRef<HTMLElement>(null);
+  const sideRef = useRef<HTMLDivElement>(null);
 
   async function runAnalysis() {
     setStatus("loading");
@@ -96,7 +97,8 @@ export default function Dashboard() {
       <main className="grid flex-1 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_440px]">
         <MapPanel projects={ready ? mapProjects : []} selected={selected} onSelectProject={selectByProject} />
 
-        <aside ref={sideRef} className="border-t border-ink lg:overflow-y-auto lg:border-t-0 lg:border-l">
+        <aside className="flex flex-col border-t border-ink lg:min-h-0 lg:border-t-0 lg:border-l">
+          <div ref={sideRef} className="min-h-0 flex-1 lg:overflow-y-auto">
           {status === "idle" && (
             <p className="px-4 py-6 text-graphite">
               Run the analysis to rank every Duke and TECO project pair by how closely their location, schedule, and
@@ -140,6 +142,8 @@ export default function Dashboard() {
                 />
               </>
             ))}
+          </div>
+          {ready && <ChatPanel key={selected?.opportunity_id ?? "all"} opportunityId={selected?.opportunity_id ?? null} />}
         </aside>
       </main>
     </div>

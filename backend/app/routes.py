@@ -174,9 +174,22 @@ def analyze(body: AnalyzeRequest, request: Request) -> AnalyzeResponse:
 @router.post("/assistant/query", response_model=AssistantResponse)
 def assistant_query(body: AssistantQuery, request: Request) -> AssistantResponse:
     service = _service(request)
-    left, right = _utility_pair(service, body.utility_a, body.utility_b)
-    analyzed = _analyze(service, left, right, OpportunityFilters())
-    result = answer_query(body.query, analyzed.opportunities)
+    focus_id = body.opportunity_id
+    if focus_id:
+        try:
+            catalog = [service.get_opportunity(focus_id)]
+        except OpportunityNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+    else:
+        left, right = _utility_pair(service, body.utility_a, body.utility_b)
+        catalog = _analyze(service, left, right, OpportunityFilters()).opportunities
+    result = answer_query(
+        body.query,
+        catalog,
+        client=getattr(request.app.state, "llm_client", None),
+        history=body.messages,
+        focus_id=focus_id,
+    )
     envelope = service.envelope()
     return AssistantResponse(
         dataset_status=envelope.dataset_status,
