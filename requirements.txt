@@ -1,8 +1,12 @@
 # Aaron Green
 # Python packages needed to run the GridSync data scripts.
+# Vercel installs this file from the repository root for the API as well.
 
 pandas
 openpyxl
 pdfplumber
 requests
 scikit-learn
+fastapi>=0.115.0
+pydantic>=2.6.0
+certifi>=2024.0.0
