@@ -8,11 +8,18 @@ import { MapContainer, TileLayer, Marker, Polyline, Tooltip, useMap } from "reac
 import type { Opportunity, Project } from "@/lib/types";
 import { MAP_CENTER, MAP_ZOOM, REDLINE } from "@/lib/config";
 import { fmtMiles, shortUtility, utilityColor, utilityShape } from "@/lib/format";
+import HeatmapLayer from "./HeatmapLayer";
+import type { HeatPoint } from "@/lib/heatmap";
+
+export type MapMode = "map" | "heatmap";
 
 interface Props {
   projects: Project[];
   selected: Opportunity | null;
   onSelectProject?: (projectId: string) => void;
+  // Both default to the existing single-map behavior, so no caller has to change.
+  mode?: MapMode;
+  heatPoints?: HeatPoint[];
 }
 
 type LL = [number, number];
@@ -88,7 +95,7 @@ function FitToSelection({ selected }: { selected: Opportunity | null }) {
   return null;
 }
 
-export default function ProjectMap({ projects, selected, onSelectProject }: Props) {
+export default function ProjectMap({ projects, selected, onSelectProject, mode = "map", heatPoints = [] }: Props) {
   const selA = selected?.project_a.id;
   const selB = selected?.project_b.id;
   const isSel = (id: string) => id === selA || id === selB;
@@ -109,10 +116,15 @@ export default function ProjectMap({ projects, selected, onSelectProject }: Prop
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <FitToProjects projects={projects} />
-      <FitToSelection selected={selected} />
+      {mode === "map" && <FitToSelection selected={selected} />}
+
+      {/* Portfolio-level view: density + score of existing opportunities, nothing new computed.
+          Replaces the individual markers below rather than overlaying them - the two modes
+          answer different questions (discovery vs. inspection), not the same one twice. */}
+      {mode === "heatmap" && <HeatmapLayer points={heatPoints} />}
 
       {/* Approximate corridors: a straight dashed line between endpoints, never presented as the route. */}
-      {ordered.map((p) => {
+      {mode === "map" && ordered.map((p) => {
         const line = corridor(p);
         if (!line) return null;
         const sel = isSel(p.id);
@@ -127,7 +139,7 @@ export default function ProjectMap({ projects, selected, onSelectProject }: Prop
         );
       })}
 
-      {ordered.map((p) => {
+      {mode === "map" && ordered.map((p) => {
         const pos = point(p);
         if (!pos) return null;
         const sel = isSel(p.id);
@@ -147,7 +159,7 @@ export default function ProjectMap({ projects, selected, onSelectProject }: Prop
         );
       })}
 
-      {selected && dimension && (
+      {mode === "map" && selected && dimension && (
         <>
           <Polyline key={`dim-${selected.opportunity_id}`} positions={dimension} pathOptions={{ color: REDLINE, weight: 2.5 }}>
             <Tooltip permanent direction="center" className="dimension-label">

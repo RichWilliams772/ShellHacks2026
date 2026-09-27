@@ -17,6 +17,7 @@ import {
 import ScoreBadge from "./ScoreBadge";
 import InfoTip from "./InfoTip";
 import UtilityMarker from "./UtilityMarker";
+import CopyBriefButton from "./CopyBriefButton";
 
 function Heading({ children }: { children: React.ReactNode }) {
   return <h3 className="mt-6 mb-2 font-display text-xl font-semibold">{children}</h3>;
@@ -102,9 +103,12 @@ export default function OpportunityDetail({ o, onBack }: { o: Opportunity; onBac
 
   return (
     <article className="px-4 pt-3 pb-8">
-      <button type="button" onClick={onBack} className="text-graphite underline hover:text-ink">
-        Back to all pairs
-      </button>
+      <div className="flex items-center justify-between gap-3">
+        <button type="button" onClick={onBack} className="text-graphite underline hover:text-ink">
+          Back to all pairs
+        </button>
+        <CopyBriefButton key={o.opportunity_id} o={o} />
+      </div>
 
       <div className="mt-4 flex items-end justify-between gap-4">
         <div>
