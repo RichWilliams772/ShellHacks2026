@@ -15,7 +15,12 @@
 }
 
 body {
-  background: var(--color-paper);
+  background:
+    repeating-linear-gradient(0deg, color-mix(in srgb, var(--color-ink) 4%, transparent) 0 1px, transparent 1px 96px),
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--color-ink) 4%, transparent) 0 1px, transparent 1px 96px),
+    repeating-linear-gradient(0deg, color-mix(in srgb, var(--color-ink) 2%, transparent) 0 1px, transparent 1px 16px),
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--color-ink) 2%, transparent) 0 1px, transparent 1px 16px),
+    var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
@@ -26,11 +31,23 @@ body {
   outline-offset: 2px;
 }
 
+::selection { background: var(--color-ink); color: var(--color-paper); }
+
+/* A thin ink scrollbar instead of the OS default - the last piece of generic browser chrome
+   left in the app now that the map controls, sliders, and selects are all custom-drawn. */
+* { scrollbar-width: thin; scrollbar-color: var(--color-graphite) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background-color: var(--color-graphite); border: 2px solid var(--color-paper); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--color-ink); }
+
 /* Keep Leaflet panes below the page's overlay UI and in the page's type. */
 .leaflet-container { font: inherit; z-index: 0; background: var(--color-paper); }
 
-/* Grey the basemap so the utility colors and the redline carry the meaning. */
-.leaflet-tile-pane { filter: grayscale(1) contrast(0.85) brightness(1.08); }
+/* OSM's raw tiles, muted rather than stripped to grayscale: real color survives (water,
+   parks, land) but toned down enough that the utility colors and the redline are still the
+   most saturated things on the map, not fighting OSM's own orange/red highway lines. */
+.leaflet-tile-pane { filter: saturate(0.45) contrast(0.95) brightness(1.04) sepia(0.06); }
 
 /* The distance label on the redline dimension. */
 .dimension-label.leaflet-tooltip {
@@ -45,3 +62,127 @@ body {
   padding: 1px 8px;
 }
 .dimension-label.leaflet-tooltip::before { display: none; }
+
+/* Redraw Leaflet's default chrome (blue rounded buttons, translucent white scale) as
+   drafting-panel instruments so nothing on the map reads as unstyled browser UI. */
+.leaflet-control-zoom {
+  border: 1px solid var(--color-ink) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.leaflet-control-zoom a {
+  background: var(--color-sheet) !important;
+  color: var(--color-ink) !important;
+  border-radius: 0 !important;
+  font-family: var(--font-display);
+}
+.leaflet-control-zoom a:hover { background: var(--color-rule) !important; }
+.leaflet-control-zoom-in { border-bottom: 1px solid var(--color-rule) !important; }
+
+.leaflet-control-scale-line {
+  border: 2px solid var(--color-ink) !important;
+  border-top: none !important;
+  background: color-mix(in srgb, var(--color-sheet) 90%, transparent) !important;
+  color: var(--color-ink) !important;
+  font-family: var(--font-sans);
+  font-size: 11px !important;
+  padding: 0 4px !important;
+}
+
+/* Custom range sliders: a drafting-instrument track with a square ink thumb, not the
+   OS default. Ticks are drawn as a repeating gradient so no extra markup is needed. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  background:
+    repeating-linear-gradient(90deg, var(--color-graphite) 0 1px, transparent 1px calc(100% / 19)),
+    var(--color-rule);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--color-ink);
+  border: 2px solid var(--color-sheet);
+  box-shadow: 0 0 0 1px var(--color-ink);
+  cursor: pointer;
+  margin-top: 0;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 0;
+  background: var(--color-ink);
+  border: 2px solid var(--color-sheet);
+  box-shadow: 0 0 0 1px var(--color-ink);
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-track { background: transparent; }
+
+/* Custom select chevron drawn in ink, replacing the OS glyph. */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%231b2230' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 24px !important;
+}
+
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.panel-in { animation: panel-in 180ms ease-out; }
+
+/* Every button gets the same tactile press, like a real drafting-panel toggle: a quick color
+   settle on hover, a slight depress on click. One rule here beats repeating it on each button. */
+button:not(:disabled) {
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, opacity 120ms ease, transform 80ms ease;
+}
+button:not(:disabled):active { transform: scale(0.97); }
+.leaflet-control-zoom a { transition: background-color 120ms ease; }
+
+/* Full-width rows (the opportunity list) shouldn't shrink from center on press - that tears
+   the row away from the list's edges. They get a flat color tap instead (Tailwind's active:). */
+.no-press-scale:active { transform: none !important; }
+
+/* The analysis checklist: each dimension checks off in sequence, left to right in time -
+   mirrors the score breakdown's own four categories, not an invented progress bar. */
+@keyframes stage-check {
+  0% { opacity: 0; transform: translateX(-3px); background: transparent; border-color: var(--color-graphite); }
+  45% { opacity: 1; transform: translateX(0); }
+  100% { opacity: 1; background: var(--color-ink); border-color: var(--color-ink); }
+}
+.stage-check {
+  opacity: 0;
+  animation: stage-check 260ms ease-out forwards;
+}
+
+/* A slow redline sweep under the checklist while the request is still in flight - only
+   noticeable if the real backend (not the mock) takes longer than the checklist itself. */
+@keyframes scan-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+.scan-sweep { animation: scan-sweep 1.4s ease-in-out infinite; }
+
+/* Utility markers read as live signals on the map, not static dots - a soft ring expands
+   and fades behind each one. Paused (via an inline style) on dimmed markers when a pair is
+   selected, so the ambient motion doesn't compete with the one pair actually being examined. */
+@keyframes marker-pulse {
+  0% { transform: scale(0.7); opacity: 0.5; }
+  70% { opacity: 0.12; }
+  100% { transform: scale(2.3); opacity: 0; }
+}
+.marker-pulse { animation: marker-pulse 2.4s cubic-bezier(0.25, 0.6, 0.4, 1) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-in { animation: none; }
+  button:not(:disabled):active { transform: none; }
+  .stage-check { animation: none; opacity: 1; background: var(--color-ink); border-color: var(--color-ink); }
+  .scan-sweep { animation: none; }
+  .marker-pulse { animation: none; opacity: 0; }
+}

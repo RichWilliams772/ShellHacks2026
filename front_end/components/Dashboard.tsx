@@ -10,13 +10,20 @@ import Filters, { ANY_DISTANCE, DEFAULT_FILTERS, type FilterState } from "./Filt
 import OpportunityList from "./OpportunityList";
 import OpportunityDetail from "./OpportunityDetail";
 import MapPanel from "./MapPanel";
-import ChatPanel from "./ChatPanel";
+import AnalysisProgress from "./AnalysisProgress";
 
 type Status = "idle" | "loading" | "ready" | "error";
+
+// The mock snapshot resolves in a few milliseconds - too fast to ever see the checklist
+// AnalysisProgress draws. Holding "loading" open for at least this long means a click on
+// "Analyze projects" always shows the real, ordered comparison it just asked for, whether
+// the answer came back instantly (mock) or took a couple of seconds (live backend).
+const MIN_LOADING_MS = 1150;
 
 export default function Dashboard() {
   const [status, setStatus] = useState<Status>("idle");
   const [data, setData] = useState<AnalyzeResponse | null>(null);
+  const [analyzedAt, setAnalyzedAt] = useState<Date | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const sideRef = useRef<HTMLDivElement>(null);
@@ -25,8 +32,12 @@ export default function Dashboard() {
     setStatus("loading");
     setSelectedId(null);
     try {
-      const { data: result } = await analyze({ utility_a: UTILITY_A, utility_b: UTILITY_B });
+      const [{ data: result }] = await Promise.all([
+        analyze({ utility_a: UTILITY_A, utility_b: UTILITY_B }),
+        new Promise((resolve) => setTimeout(resolve, MIN_LOADING_MS)),
+      ]);
       setData(result);
+      setAnalyzedAt(new Date());
       setFilters(DEFAULT_FILTERS);
       setStatus("ready");
     } catch (e) {
@@ -92,7 +103,12 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen flex-col lg:h-screen">
-      <TitleBlock summary={ready ? data!.summary : null} loading={status === "loading"} onAnalyze={runAnalysis} />
+      <TitleBlock
+        summary={ready ? data!.summary : null}
+        analyzedAt={ready ? analyzedAt : null}
+        loading={status === "loading"}
+        onAnalyze={runAnalysis}
+      />
 
       <main className="grid flex-1 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_440px]">
         <MapPanel
@@ -110,11 +126,7 @@ export default function Dashboard() {
               type line up.
             </p>
           )}
-          {status === "loading" && (
-            <p className="px-4 py-6 text-graphite" role="status">
-              Comparing project pairs…
-            </p>
-          )}
+          {status === "loading" && <AnalysisProgress />}
           {status === "error" && (
             <div className="px-4 py-6">
               <p>
@@ -127,28 +139,30 @@ export default function Dashboard() {
               </button>
             </div>
           )}
-          {ready &&
-            (selected ? (
-              <OpportunityDetail o={selected} onBack={() => setSelectedId(null)} />
-            ) : (
-              <>
-                <Filters value={filters} onChange={setFilters} years={filterOptions.years} projectTypes={filterOptions.types} />
-                <p className="flex items-baseline justify-between border-b border-rule px-4 py-2">
-                  <span className="font-display text-xl font-semibold">Ranked pairs</span>
-                  <span className="text-sm text-graphite">
-                    {filtered.length} of {opportunities.length}
-                  </span>
-                </p>
-                <OpportunityList
-                  opportunities={filtered}
-                  onSelect={setSelectedId}
-                  total={opportunities.length}
-                  onResetFilters={() => setFilters(DEFAULT_FILTERS)}
-                />
-              </>
-            ))}
+          {ready && (
+            <div key={selected ? selected.opportunity_id : "list"} className="panel-in">
+              {selected ? (
+                <OpportunityDetail o={selected} onBack={() => setSelectedId(null)} />
+              ) : (
+                <>
+                  <Filters value={filters} onChange={setFilters} years={filterOptions.years} projectTypes={filterOptions.types} />
+                  <p className="flex items-baseline justify-between border-b border-rule px-4 py-2">
+                    <span className="font-display text-xl font-semibold">Ranked pairs</span>
+                    <span className="text-sm text-graphite">
+                      {filtered.length} of {opportunities.length}
+                    </span>
+                  </p>
+                  <OpportunityList
+                    opportunities={filtered}
+                    onSelect={setSelectedId}
+                    total={opportunities.length}
+                    onResetFilters={() => setFilters(DEFAULT_FILTERS)}
+                  />
+                </>
+              )}
+            </div>
+          )}
           </div>
-          {ready && <ChatPanel key={selected?.opportunity_id ?? "all"} opportunityId={selected?.opportunity_id ?? null} />}
         </aside>
       </main>
     </div>

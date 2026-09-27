@@ -7,6 +7,7 @@ import { buildHeatPoints } from "@/lib/heatmap";
 import { UTILITY_A, UTILITY_B } from "@/lib/config";
 import { shortUtility, utilityColor, utilityShape } from "@/lib/format";
 import UtilityMarker from "./UtilityMarker";
+import ChatWidget from "./ChatWidget";
 import type { MapMode } from "./ProjectMap";
 
 const ProjectMap = dynamic(() => import("./ProjectMap"), {
@@ -31,14 +32,18 @@ export default function MapPanel({ projects, selected, onSelectProject, opportun
     <section className="relative h-[60vh] min-h-[420px] lg:h-full">
       <ProjectMap projects={projects} selected={selected} onSelectProject={onSelectProject} mode={mode} heatPoints={heatPoints} />
 
-      <div className="absolute top-3 right-3 z-[1000] flex border border-ink bg-sheet text-sm" role="group" aria-label="Map view">
+      <div
+        className="absolute top-3 right-3 z-[1000] flex overflow-hidden rounded-full border border-ink bg-sheet text-sm shadow-[0_4px_14px_-6px_rgba(27,34,48,0.35)]"
+        role="group"
+        aria-label="Map view"
+      >
         {(["map", "heatmap"] as const).map((m) => (
           <button
             key={m}
             type="button"
             onClick={() => setMode(m)}
             aria-pressed={mode === m}
-            className={`px-3 py-1.5 font-semibold ${m === "map" ? "border-r border-ink" : ""} ${
+            className={`px-4 py-1.5 font-semibold ${m === "map" ? "border-r border-ink" : ""} ${
               mode === m ? "bg-ink text-paper" : "hover:bg-rule"
             }`}
           >
@@ -48,7 +53,7 @@ export default function MapPanel({ projects, selected, onSelectProject, opportun
       </div>
 
       {mode === "map" && (
-        <div className="pointer-events-none absolute bottom-3 left-3 z-[1000] space-y-1 border border-ink bg-sheet/95 px-3 py-2 text-sm">
+        <div className="pointer-events-none absolute bottom-3 left-3 z-[1000] space-y-1 rounded-lg border border-ink bg-sheet/95 px-3 py-2 text-sm shadow-[0_4px_14px_-6px_rgba(27,34,48,0.3)]">
           {[UTILITY_A, UTILITY_B].map((u) => (
             <p key={u} className="flex items-center gap-2">
               <UtilityMarker shape={utilityShape(u)} color={utilityColor(u)} />
@@ -67,11 +72,14 @@ export default function MapPanel({ projects, selected, onSelectProject, opportun
       )}
 
       {mode === "heatmap" && (
-        <div className="pointer-events-none absolute bottom-3 left-3 z-[1000] max-w-[280px] space-y-1 border border-ink bg-sheet/95 px-3 py-2 text-sm">
+        <div className="pointer-events-none absolute bottom-3 left-3 z-[1000] max-w-[280px] space-y-1 rounded-lg border border-ink bg-sheet/95 px-3 py-2 text-sm shadow-[0_4px_14px_-6px_rgba(27,34,48,0.3)]">
           <p className="font-display font-semibold tracking-wide uppercase">Coordination opportunity density</p>
           <div className="flex items-center gap-2">
             <span className="text-xs text-graphite">Lower</span>
-            <span className="h-2 flex-1 bg-gradient-to-r from-blue-400 via-yellow-300 to-redline" />
+            <span
+              className="h-2 flex-1 rounded-full"
+              style={{ background: "linear-gradient(to right, #c9cec6 0%, #5b6472 35%, #1b2230 70%, #c8352b 100%)" }}
+            />
             <span className="text-xs text-graphite">Higher</span>
           </div>
           <p className="text-xs text-graphite">
@@ -82,16 +90,18 @@ export default function MapPanel({ projects, selected, onSelectProject, opportun
       )}
 
       {projects.length === 0 && (
-        <p className="pointer-events-none absolute inset-x-0 top-6 z-[1000] mx-auto w-fit max-w-[90%] border border-ink bg-sheet px-4 py-2 text-center">
+        <p className="pointer-events-none absolute inset-x-0 top-6 z-[1000] mx-auto w-fit max-w-[90%] rounded-lg border border-ink bg-sheet px-4 py-2 text-center shadow-[0_4px_14px_-6px_rgba(27,34,48,0.3)]">
           Run the analysis to place both utilities&apos; planned projects on the map.
         </p>
       )}
 
       {mode === "heatmap" && projects.length > 0 && heatPoints.length === 0 && (
-        <p className="pointer-events-none absolute inset-x-0 top-6 z-[1000] mx-auto w-fit max-w-[90%] border border-ink bg-sheet px-4 py-2 text-center">
+        <p className="pointer-events-none absolute inset-x-0 top-6 z-[1000] mx-auto w-fit max-w-[90%] rounded-lg border border-ink bg-sheet px-4 py-2 text-center shadow-[0_4px_14px_-6px_rgba(27,34,48,0.3)]">
           No coordination opportunities with sufficient location data are available for this view.
         </p>
       )}
+
+      {projects.length > 0 && <ChatWidget opportunity={selected} />}
     </section>
   );
 }

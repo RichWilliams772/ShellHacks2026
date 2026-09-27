@@ -63,14 +63,30 @@ function ticks([p, q]: [LL, LL]): LL[][] {
   ]);
 }
 
+// Deterministic 0-1.8s stagger from the project id, so 20-50 markers don't all pulse in
+// lockstep (which reads as a synchronized flash, not ambient activity).
+function pulseDelay(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return (h % 900) / 500;
+}
+
 function markerIcon(p: Project, selected: boolean, dimmed: boolean) {
   const size = selected ? 20 : 13;
   const shape = utilityShape(p.utility);
+  const color = utilityColor(p.utility);
   const radius = shape === "circle" ? "9999px" : "1px";
   const rotate = shape === "diamond" ? "rotate(45deg) scale(0.85)" : "none";
   const border = selected ? `3px solid ${REDLINE}` : "2px solid #f7f8f5";
-  const html = `<div style="width:${size}px;height:${size}px;background:${utilityColor(p.utility)};border:${border};border-radius:${radius};transform:${rotate};opacity:${dimmed ? 0.35 : 1}"></div>`;
-  return L.divIcon({ html, className: "", iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
+  // Room for the pulse ring to expand to ~2.6x the dot without clipping.
+  const box = Math.ceil(size * 2.6);
+  const c = box / 2;
+  const half = size / 2;
+  const html = `<div style="position:relative;width:${box}px;height:${box}px;opacity:${dimmed ? 0.35 : 1}">
+    <span class="marker-pulse" style="position:absolute;left:${c - half}px;top:${c - half}px;width:${size}px;height:${size}px;background:${color};border-radius:9999px;animation-delay:${pulseDelay(p.id)}s${dimmed ? ";animation-play-state:paused" : ""}"></span>
+    <div style="position:absolute;left:${c - half}px;top:${c - half}px;width:${size}px;height:${size}px;background:${color};border:${border};border-radius:${radius};transform:${rotate};box-shadow:0 1px 3px rgba(27,34,48,0.5)"></div>
+  </div>`;
+  return L.divIcon({ html, className: "", iconSize: [box, box], iconAnchor: [c, c] });
 }
 
 // After an analysis loads, frame every located project (Duke spans most of the state, not just Tampa Bay).
@@ -111,6 +127,8 @@ export default function ProjectMap({ projects, selected, onSelectProject, mode =
 
   return (
     <MapContainer center={MAP_CENTER} zoom={MAP_ZOOM} scrollWheelZoom={false} className="h-full w-full">
+      {/* CARTO's keyless basemaps were retired (now gate behind an API key), so this stays on
+          OSM's own tiles - the CSS filter below is what keeps the color muted, not the source. */}
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"

@@ -29,7 +29,7 @@ interface Props {
 export default function Filters({ value, onChange, years, projectTypes }: Props) {
   const set = <K extends keyof FilterState>(k: K, v: FilterState[K]) => onChange({ ...value, [k]: v });
   const label = "text-sm text-graphite";
-  const input = "mt-1 w-full rounded-sm border border-rule bg-sheet px-2 py-1 text-ink";
+  const input = "mt-1 w-full rounded-lg border border-rule bg-sheet px-2 py-1 text-ink";
 
   return (
     <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-ink px-4 py-3">

@@ -71,52 +71,68 @@ function followUpQuestions(o: Opportunity): string[] {
   return questions;
 }
 
-export function formatCoordinationBrief(o: Opportunity): string {
+// One section = one heading plus its body lines (bullets are already "- " prefixed here so
+// both renderers - plain text and the PDF - can just print them without re-deriving meaning).
+export interface BriefSection {
+  heading: string;
+  lines: string[];
+}
+
+export interface Brief {
+  title: string; // "<project A> x <project B>"
+  score: string; // "63/100 (high confidence in the inputs)"
+  sections: BriefSection[];
+}
+
+// The single source of truth for what a Coordination Brief says. formatCoordinationBrief()
+// (plain text, for copy/paste) and lib/pdf.ts (the downloadable report) both render this same
+// structure, so the two can never drift apart on what a brief actually claims.
+export function buildBrief(o: Opportunity): Brief {
   const a = o.analysis;
+  const sections: BriefSection[] = [
+    { heading: "Location", lines: [locationLine(o)] },
+    { heading: "Timing", lines: [timingLine(o)] },
+    {
+      heading: "Potential Coordination Areas",
+      lines:
+        o.potential_shared_resources.length > 0
+          ? o.potential_shared_resources.map((r) => `- ${r.display_name} (${r.potential.toLowerCase()} potential)`)
+          : ["No shared-resource categories were identified from the available project characteristics."],
+    },
+    {
+      heading: "Data Confidence",
+      lines: [a.score_confidence ? a.score_confidence : NA_LINE("Data confidence", "unavailable")],
+    },
+  ];
+
+  const questions = followUpQuestions(o);
+  if (questions.length > 0) sections.push({ heading: "Planner Follow-Up", lines: questions.map((q) => `- ${q}`) });
+
+  const sources = [...new Set([...projectSources(o.project_a), ...projectSources(o.project_b)])];
+  if (sources.length > 0) sections.push({ heading: "Sources", lines: sources.map((s) => `- ${s}`) });
+
+  return {
+    title: `${o.project_a.name} (${o.project_a.id}) x ${o.project_b.name} (${o.project_b.id})`,
+    score: a.score_confidence
+      ? `${Math.round(a.coordination_score)}/100 (${a.score_confidence.toLowerCase()} confidence in the inputs)`
+      : `${Math.round(a.coordination_score)}/100`,
+    sections,
+  };
+}
+
+export function formatCoordinationBrief(o: Opportunity): string {
+  const brief = buildBrief(o);
   const lines: string[] = [];
 
   lines.push("GridSync Coordination Brief", "");
   lines.push("Opportunity");
-  lines.push(`${o.project_a.name} (${o.project_a.id}) x ${o.project_b.name} (${o.project_b.id})`, "");
-
+  lines.push(brief.title, "");
   lines.push("Coordination Score");
-  lines.push(
-    a.score_confidence
-      ? `${Math.round(a.coordination_score)}/100 (${a.score_confidence.toLowerCase()} confidence in the inputs)`
-      : `${Math.round(a.coordination_score)}/100`,
-    "",
-  );
+  lines.push(brief.score, "");
 
-  lines.push("Location");
-  lines.push(locationLine(o), "");
-
-  lines.push("Timing");
-  lines.push(timingLine(o), "");
-
-  lines.push("Potential Coordination Areas");
-  if (o.potential_shared_resources.length > 0) {
-    for (const r of o.potential_shared_resources) {
-      lines.push(`- ${r.display_name} (${r.potential.toLowerCase()} potential)`);
-    }
-  } else {
-    lines.push("No shared-resource categories were identified from the available project characteristics.");
-  }
-  lines.push("");
-
-  lines.push("Data Confidence");
-  lines.push(a.score_confidence ? a.score_confidence : NA_LINE("Data confidence", "unavailable"), "");
-
-  const questions = followUpQuestions(o);
-  if (questions.length > 0) {
-    lines.push("Planner Follow-Up");
-    for (const q of questions) lines.push(`- ${q}`);
-    lines.push("");
-  }
-
-  const sources = [...new Set([...projectSources(o.project_a), ...projectSources(o.project_b)])];
-  if (sources.length > 0) {
-    lines.push("Sources");
-    for (const s of sources) lines.push(`- ${s}`);
+  for (const section of brief.sections) {
+    lines.push(section.heading);
+    lines.push(...section.lines);
     lines.push("");
   }
 

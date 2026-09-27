@@ -4,6 +4,7 @@ import type {
   AnalyzeResponse,
   AssistantQuery,
   AssistantResponse,
+  AssistantSource,
   Opportunity,
   Project,
   SharedResource,
@@ -277,6 +278,7 @@ export async function askAssistant(body: AssistantQuery): Promise<AssistantRespo
     llm_used?: unknown;
     llm_configured?: unknown;
     assistant_mode?: unknown;
+    sources?: unknown;
   };
   return {
     assistant_mode: "structured_retrieval",
@@ -284,5 +286,25 @@ export async function askAssistant(body: AssistantQuery): Promise<AssistantRespo
     llm_configured: record.llm_configured === true,
     answer: record.answer,
     note: typeof record.note === "string" ? record.note : "",
+    sources: parseSources(record.sources),
   };
+}
+
+function parseSources(value: unknown): AssistantSource[] {
+  if (!Array.isArray(value)) return [];
+  const sources: AssistantSource[] = [];
+  for (const item of value) {
+    if (
+      item &&
+      typeof item === "object" &&
+      typeof (item as { document_title?: unknown }).document_title === "string" &&
+      typeof (item as { page?: unknown }).page === "number"
+    ) {
+      sources.push({
+        document_title: (item as { document_title: string }).document_title,
+        page: (item as { page: number }).page,
+      });
+    }
+  }
+  return sources;
 }
