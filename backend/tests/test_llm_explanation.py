@@ -83,7 +83,24 @@ def test_selected_opportunity_sends_one_evidence_record(
     assert evidence["reasons"]
     assert evidence["shared_resources"]
     assert "DUKE-P0313" not in user
-    assert "known endpoints" in fake.messages[0][0]["content"]
+    system = fake.messages[0][0]["content"]
+    assert "minimum distance between known project endpoints" in system
+    assert "closest known endpoints" in system
+    assert "the projects are N miles apart" in system
+    assert "no public filing exists" in system
+    spoken = evidence["plain_language"]
+    assert spoken["distance"] == (
+        "15.05 miles is the minimum distance between known project endpoints."
+    )
+    assert spoken["missing"] == [
+        "The Tampa Electric project's source filing link is missing from this record."
+    ]
+    assert all("miles apart" not in reason.casefold() for reason in evidence["reasons"])
+    assert any(
+        "miles apart" in reason.casefold()
+        for reason in body["opportunities"][0]["reasons"]
+    )
+    assert "has no source_url" not in " ".join(evidence["evidence_gaps"])
 
 
 def test_missing_opportunity_is_not_sent_to_the_model() -> None:
@@ -108,12 +125,17 @@ def test_missing_key_does_not_claim_a_model_call(monkeypatch: pytest.MonkeyPatch
     assert "What's missing" in body["answer"]
     assert "63.3" in body["answer"]
     assert "Coordination score 63.3/100." in body["answer"]
-    assert "15.05 miles is the minimum distance between known endpoints" in body["answer"]
+    assert "15.05 miles is the minimum distance between known project endpoints." in body["answer"]
+    assert "miles apart" not in body["answer"].casefold()
     assert "There is no confirmed exact schedule overlap." in body["answer"]
     assert "Both projects involve transmission upgrades." in body["answer"]
     assert "Project names and types share terms" in body["answer"]
     assert "descriptions share" not in body["answer"].casefold()
-    assert "The source filing link is missing from this record." in body["answer"]
+    assert (
+        "The Tampa Electric project's source filing link is missing from this record."
+        in body["answer"]
+    )
+    assert "Duke Energy Florida project's source filing link is missing" not in body["answer"]
     assert "transmission_upgrade" not in body["answer"]
     assert "source_url" not in body["answer"]
     assert TOP_ID not in body["answer"]
@@ -137,11 +159,16 @@ def test_weaker_pair_states_limits_without_a_model(monkeypatch: pytest.MonkeyPat
     answer = response.json()["answer"]
     assert response.json()["llm_used"] is False
     assert "Coordination score 32/100." in answer
-    assert "73.16 miles is the minimum distance between known endpoints." in answer
+    assert "73.16 miles is the minimum distance between known project endpoints." in answer
+    assert "miles apart" not in answer.casefold()
     assert "Project types differ: transmission line and substation hardening." in answer
     assert "There is no confirmed exact schedule overlap." in answer
     assert "not strong coordination evidence by itself" in answer
-    assert "The source filing link is missing from this record." in answer
+    assert (
+        "The Tampa Electric project's source filing link is missing from this record."
+        in answer
+    )
+    assert "Duke Energy Florida project's source filing link is missing" not in answer
     assert "descriptions share" not in answer.casefold()
 
 

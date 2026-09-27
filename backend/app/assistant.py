@@ -51,13 +51,17 @@ _LLM_SYSTEM = (
     "or opportunity IDs unless the user asks for technical details. "
     "For a selected pair, the opening lines are plain_language.score, then "
     "plain_language.distance copied exactly, then every plain_language.counterevidence "
-    "sentence copied exactly. Do not round distance_miles or call it a route length, "
-    "and do not repeat these directions in the answer. Text similarity compares "
+    "sentence copied exactly. Whenever you mention distance, say 'minimum distance "
+    "between known project endpoints' or 'closest known endpoints'. Do not later "
+    "shorten that to 'the projects are N miles apart' or any wording that could mean "
+    "a route distance. Do not round distance_miles, and do not repeat these directions "
+    "in the answer. Text similarity compares "
     "project names and types, not project descriptions. Never say descriptions "
     "share terms. Sharing a calendar year is not a confirmed schedule overlap and "
-    "is not strong coordination evidence by itself. What's missing must use only "
-    "plain_language.missing. When that list says the source filing link is missing, "
-    "use that phrase. Do not list shared resources unless the question asks what "
+    "is not strong coordination evidence by itself. What's missing must copy "
+    "plain_language.missing exactly. Name only the utility whose source filing link "
+    "is missing. Do not imply the other project lacks a link, and do not say that "
+    "no public filing exists. Do not list shared resources unless the question asks what "
     "the projects could share or coordinate. Unavailable is not zero. "
     "Do not compute or invent distances, dates, scores, resources, sources, savings, "
     "probabilities, or a recommendation to coordinate. Do not mention opportunities "
@@ -71,7 +75,7 @@ _DASHBOARD_STEPS = (
     "Open an opportunity card to read its coordination score, reasons, coordination "
     "package, and sources.",
     "Use the map to see project locations. A listed distance is the minimum distance "
-    "between known endpoints. A line that is not a route is an approximate corridor.",
+    "between known project endpoints. A drawn line is an approximate corridor.",
 )
 _MAX_CONTEXT = 5
 _MAX_HISTORY = 6
@@ -380,13 +384,27 @@ def _counterevidence(opportunity: Opportunity) -> list[str]:
     return lines
 
 
-def _missing_lines(opportunity: Opportunity) -> list[str]:
+def _distance_sentence(opportunity: Opportunity) -> str | None:
+    distance = opportunity.features.distance_miles
+    if isinstance(distance, (int, float)) and not isinstance(distance, bool):
+        return f"{distance} miles is the minimum distance between known project endpoints."
+    return None
+
+
+def _filing_link_lines(opportunity: Opportunity) -> list[str]:
+    """Name each project whose source URL is absent. Does not invent a filing."""
     lines: list[str] = []
-    if any("source_url" in project.provenance_gaps for project in (
-        opportunity.project_a,
-        opportunity.project_b,
-    )):
-        lines.append("The source filing link is missing from this record.")
+    for project in (opportunity.project_a, opportunity.project_b):
+        if "source_url" not in project.provenance_gaps:
+            continue
+        lines.append(
+            f"The {project.utility} project's source filing link is missing from this record."
+        )
+    return lines
+
+
+def _missing_lines(opportunity: Opportunity) -> list[str]:
+    lines = _filing_link_lines(opportunity)
     for gap in opportunity.evidence_gaps:
         if "source_url" in gap or "temporal_score" in gap:
             continue
@@ -394,21 +412,47 @@ def _missing_lines(opportunity: Opportunity) -> list[str]:
     return lines
 
 
+def _model_reasons(opportunity: Opportunity) -> list[str]:
+    """Assistant context only. Stored reasons on the opportunity stay unchanged."""
+    distance = _distance_sentence(opportunity)
+    reasons: list[str] = []
+    for reason in opportunity.reasons:
+        if "miles apart" in reason.casefold():
+            if distance and distance not in reasons:
+                reasons.append(distance)
+            continue
+        reasons.append(reason)
+    return reasons
+
+
+def _model_gaps(opportunity: Opportunity) -> list[str]:
+    gaps = _filing_link_lines(opportunity)
+    for gap in opportunity.evidence_gaps:
+        if "source_url" in gap:
+            continue
+        gaps.append(gap)
+    return gaps
+
+
 def _plain_language(opportunity: Opportunity) -> dict[str, object]:
-    distance = opportunity.features.distance_miles
-    distance_sentence = None
-    if isinstance(distance, (int, float)) and not isinstance(distance, bool):
-        label = opportunity.features.distance_label or "minimum distance between known endpoints"
-        distance_sentence = f"{distance} miles is the {label}."
     score = opportunity.coordination_score
     score_sentence = "Coordination score is not in the record."
     if isinstance(score, (int, float)) and not isinstance(score, bool):
         score_sentence = f"Coordination score {_score_label(score)}."
     return {
         "score": score_sentence,
-        "distance": distance_sentence,
+        "distance": _distance_sentence(opportunity),
+        "distance_rule": (
+            "If you mention this distance again, say minimum distance between known "
+            "project endpoints, or closest known endpoints."
+        ),
         "counterevidence": _counterevidence(opportunity),
         "missing": _missing_lines(opportunity),
+        "filing_link_rule": (
+            "A missing source filing link applies only to the named utility. "
+            "It does not mean the other project lacks a link, and it does not mean "
+            "no public filing exists."
+        ),
         "text_similarity_note": (
             "Text similarity compares project names and types, not project descriptions."
         ),
@@ -613,8 +657,8 @@ def opportunity_evidence(opportunity: Opportunity) -> dict[str, object]:
             "similarity": confidence.similarity,
             "overall_score": confidence.overall_score,
         },
-        "reasons": list(opportunity.reasons),
-        "evidence_gaps": list(opportunity.evidence_gaps),
+        "reasons": _model_reasons(opportunity),
+        "evidence_gaps": _model_gaps(opportunity),
         "plain_language": _plain_language(opportunity),
         "shared_resources": [
             {
