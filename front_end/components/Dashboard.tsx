@@ -24,10 +24,28 @@ const ANALYSIS_MIN = 280;
 const MAP_MIN = 360;
 const DIVIDER = 12;
 const KEY_STEP = 24;
+const MAP_HEIGHT_MIN = 220;
+const MAP_HANDLE = 44;
 
 function clampAnalysis(width: number, containerWidth: number) {
   const max = Math.max(ANALYSIS_MIN, containerWidth - MAP_MIN - DIVIDER);
   return Math.min(max, Math.max(ANALYSIS_MIN, Math.round(width)));
+}
+
+function measureCssHeight(value: string) {
+  const probe = document.createElement("div");
+  probe.style.position = "absolute";
+  probe.style.visibility = "hidden";
+  probe.style.pointerEvents = "none";
+  probe.style.height = value;
+  document.body.appendChild(probe);
+  const height = probe.getBoundingClientRect().height;
+  probe.remove();
+  return height;
+}
+
+function clampMapHeight(height: number, max: number) {
+  return Math.min(max, Math.max(MAP_HEIGHT_MIN, Math.round(height)));
 }
 
 export default function Dashboard() {
@@ -39,8 +57,13 @@ export default function Dashboard() {
   const sideRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const dividerRef = useRef<HTMLDivElement>(null);
+  const mapFrameRef = useRef<HTMLDivElement>(null);
+  const mapDividerRef = useRef<HTMLDivElement>(null);
+  const mapMaxRef = useRef(560);
   const [analysisWidth, setAnalysisWidth] = useState(ANALYSIS_DEFAULT);
   const [analysisMax, setAnalysisMax] = useState(ANALYSIS_DEFAULT);
+  const [mapHeight, setMapHeight] = useState<number | null>(null);
+  const [mapMax, setMapMax] = useState(560);
 
   async function runAnalysis() {
     setStatus("loading");
@@ -174,6 +197,75 @@ export default function Dashboard() {
     }
   }
 
+  function mapLimit() {
+    const max = Math.max(MAP_HEIGHT_MIN, Math.round(measureCssHeight("70dvh")));
+    mapMaxRef.current = max;
+    setMapMax(max);
+    return max;
+  }
+
+  useEffect(() => {
+    const onResize = () => {
+      if (window.matchMedia("(min-width: 1024px)").matches) return;
+      const max = Math.max(MAP_HEIGHT_MIN, Math.round(measureCssHeight("70dvh")));
+      mapMaxRef.current = max;
+      setMapMax(max);
+      setMapHeight((height) => (height == null ? height : clampMapHeight(height, max)));
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const mapHeightFromPointer = useCallback((clientY: number) => {
+    const frame = mapFrameRef.current;
+    if (!frame) return;
+    const top = frame.getBoundingClientRect().top;
+    setMapHeight(clampMapHeight(clientY - top - MAP_HANDLE / 2, mapMaxRef.current));
+  }, []);
+
+  useEffect(() => {
+    const el = mapDividerRef.current;
+    if (!el) return;
+    let pointerId: number | null = null;
+    const move = (event: globalThis.PointerEvent) => {
+      if (pointerId === null || event.pointerId !== pointerId) return;
+      mapHeightFromPointer(event.clientY);
+    };
+    const up = (event: globalThis.PointerEvent) => {
+      if (pointerId === null || event.pointerId !== pointerId) return;
+      pointerId = null;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+    const down = (event: globalThis.PointerEvent) => {
+      if (event.button !== 0) return;
+      pointerId = event.pointerId;
+      const max = Math.max(MAP_HEIGHT_MIN, Math.round(measureCssHeight("70dvh")));
+      mapMaxRef.current = max;
+      setMapMax(max);
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+    };
+    el.addEventListener("pointerdown", down);
+    return () => {
+      el.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+  }, [mapHeightFromPointer]);
+
+  function onMapDividerKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    const max = mapLimit();
+    const current = mapHeight ?? mapFrameRef.current?.getBoundingClientRect().height ?? MAP_HEIGHT_MIN;
+    const next = current + (event.key === "ArrowUp" ? -KEY_STEP : KEY_STEP);
+    setMapHeight(clampMapHeight(next, max));
+  }
+
   function selectByProject(projectId: string) {
     const best = filtered.find((o) => o.project_a.id === projectId || o.project_b.id === projectId);
     if (best) setSelectedId(best.opportunity_id);
@@ -193,15 +285,39 @@ export default function Dashboard() {
       <main
         ref={mainRef}
         className="flex flex-1 flex-col lg:min-h-0 lg:flex-row"
-        style={{ "--gs-analysis": `${analysisWidth}px` } as CSSProperties}
+        style={
+          {
+            "--gs-analysis": `${analysisWidth}px`,
+            "--gs-map-h": mapHeight == null ? "clamp(220px, max(60vh, 420px), 70dvh)" : `${mapHeight}px`,
+          } as CSSProperties
+        }
       >
-        <div className="min-w-0 lg:h-full lg:min-h-0 lg:min-w-[360px] lg:flex-1 lg:basis-0">
+        <div
+          ref={mapFrameRef}
+          className="gs-map-frame min-w-0 lg:h-full lg:min-h-0 lg:min-w-[360px] lg:flex-1 lg:basis-0"
+        >
           <MapPanel
             projects={ready ? mapProjects : []}
             selected={selected}
             onSelectProject={selectByProject}
             opportunities={ready ? filtered : []}
           />
+        </div>
+
+        <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize the map. Up arrow shortens the map."
+          aria-valuemin={MAP_HEIGHT_MIN}
+          aria-valuemax={mapMax}
+          aria-valuenow={mapHeight ?? MAP_HEIGHT_MIN}
+          aria-valuetext={`${mapHeight ?? MAP_HEIGHT_MIN} pixel map`}
+          tabIndex={0}
+          ref={mapDividerRef}
+          className="flex h-11 w-full shrink-0 cursor-row-resize touch-none select-none items-center justify-center bg-sheet lg:hidden"
+          onKeyDown={onMapDividerKeyDown}
+        >
+          <span aria-hidden className="h-1 w-16 rounded-full bg-ink" />
         </div>
 
         <div

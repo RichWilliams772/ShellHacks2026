@@ -179,6 +179,15 @@ button:not(:disabled):active { transform: scale(0.97); }
 }
 .marker-pulse { animation: marker-pulse 2.4s cubic-bezier(0.25, 0.6, 0.4, 1) infinite; }
 
+/* Phone and tablet map height. Desktop keeps the flex row and ignores this. */
+@media (width < 1024px) {
+  .gs-map-frame {
+    height: var(--gs-map-h);
+    min-height: 220px;
+    max-height: 70dvh;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .panel-in { animation: none; }
   button:not(:disabled):active { transform: none; }

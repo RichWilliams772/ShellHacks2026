@@ -29,7 +29,7 @@ export default function MapPanel({ projects, selected, onSelectProject, opportun
   const heatPoints = useMemo(() => buildHeatPoints(opportunities), [opportunities]);
 
   return (
-    <section className="relative h-[60vh] min-h-[420px] lg:h-full">
+    <section className="relative h-full min-h-0">
       <ProjectMap projects={projects} selected={selected} onSelectProject={onSelectProject} mode={mode} heatPoints={heatPoints} />
 
       <div
