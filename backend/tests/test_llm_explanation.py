@@ -84,10 +84,8 @@ def test_selected_opportunity_sends_one_evidence_record(
     assert evidence["shared_resources"]
     assert "DUKE-P0313" not in user
     system = fake.messages[0][0]["content"]
-    assert "minimum distance between known project endpoints" in system
-    assert "closest known endpoints" in system
-    assert "the projects are N miles apart" in system
-    assert "no public filing exists" in system
+    assert "never invent a fact" in system
+    assert "reason freely" in system
     spoken = evidence["plain_language"]
     assert spoken["distance"] == (
         "15.05 miles is the minimum distance between known project endpoints."
@@ -358,3 +356,67 @@ def test_system_role_is_rejected() -> None:
         },
     )
     assert response.status_code == 422
+
+
+def test_document_relevant_question_sends_context_and_returns_sources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GRIDSYNC_LLM_API_KEY", "test-key")
+    fake = FakeLlm("The Storm Protection Plan lists Distribution Lateral Undergrounding.")
+    client.app.state.llm_client = fake
+    response = _ask(
+        TOP_ID,
+        query="What does the Storm Protection Plan say about Total Revenue "
+        "Requirements by Program and Distribution Lateral Undergrounding?",
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["llm_used"] is True
+    assert body["sources"]
+    assert body["sources"][0]["page"] >= 1
+    assert body["sources"][0]["document_title"].startswith("Tampa Electric Modified 2026-2035")
+    user = fake.messages[0][1]["content"]
+    document_context = json.loads(user)["document_context"]
+    assert document_context
+    assert any("Distribution Lateral Undergrounding" in c["text"] for c in document_context)
+
+
+def test_score_question_sends_no_document_context(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GRIDSYNC_LLM_API_KEY", "test-key")
+    fake = FakeLlm("The Coordination Score is 63.3/100.")
+    client.app.state.llm_client = fake
+    response = _ask(TOP_ID, query="What is the Coordination Score for this pair?")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["sources"] == []
+    user = fake.messages[0][1]["content"]
+    assert json.loads(user)["document_context"] == []
+
+
+def test_savings_and_what_if_questions_reach_the_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """These used to be hard-blocked before any model call. Now the model answers
+    them directly, grounded in the same evidence as any other question - it isn't
+    a separate code path anymore."""
+    monkeypatch.setenv("GRIDSYNC_LLM_API_KEY", "test-key")
+    fake = FakeLlm(
+        "GridSync doesn't calculate a savings figure or ROI for this pairing - the "
+        "coordination score only reflects how strongly the available data lines up. "
+        "If the Tampa Electric project's schedule moved up by six months, the two "
+        "would likely land in the same year, which could strengthen the case."
+    )
+    client.app.state.llm_client = fake
+    response = _ask(
+        TOP_ID,
+        query="What savings should we expect, and what if TECO moved their schedule up six months?",
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["llm_used"] is True
+    assert body["llm_configured"] is True
+    assert "$" not in body["answer"]
+    assert len(fake.messages) == 1
+    system = fake.messages[0][0]["content"]
+    assert "never invent a fact" in system
+    assert "what if" in system.lower()

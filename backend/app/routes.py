@@ -203,6 +203,7 @@ def assistant_query(body: AssistantQuery, request: Request) -> AssistantResponse
         note=result.note,
         filters_applied=result.filters_applied,
         opportunities=result.opportunities,
+        sources=result.sources,
     )
 
 

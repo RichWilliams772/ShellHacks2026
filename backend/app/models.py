@@ -452,6 +452,13 @@ class AssistantQuery(BaseModel):
         return value
 
 
+class AssistantSource(BaseModel):
+    """One cited PDF page. Only present when the answer actually used it."""
+
+    document_title: str
+    page: int
+
+
 class AssistantResponse(DataEnvelope):
     assistant_mode: Literal["structured_retrieval"]
     llm_used: bool
@@ -460,3 +467,4 @@ class AssistantResponse(DataEnvelope):
     note: str
     filters_applied: dict[str, Any]
     opportunities: list[Opportunity]
+    sources: list[AssistantSource] = Field(default_factory=list)
