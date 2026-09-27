@@ -99,6 +99,19 @@ function FitToProjects({ projects }: { projects: Project[] }) {
   return null;
 }
 
+function SyncMapSize() {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer();
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize({ animate: false, pan: false });
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
+}
+
 function FitToSelection({ selected }: { selected: Opportunity | null }) {
   const map = useMap();
   useEffect(() => {
@@ -134,6 +147,7 @@ export default function ProjectMap({ projects, selected, onSelectProject, mode =
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <FitToProjects projects={projects} />
+      <SyncMapSize />
       {mode === "map" && <FitToSelection selected={selected} />}
 
       {/* Portfolio-level view: density + score of existing opportunities, nothing new computed.
