@@ -24,10 +24,17 @@ export default function HeatmapLayer({ points }: Props) {
   // dependency change or unmount would leak a duplicate layer onto the map every re-render.
   useEffect(() => {
     if (points.length === 0) return;
-    // max is calibrated below the true 0-1 weight ceiling so a real concentration of
-    // high-scoring points reaches the gradient's warm end at this dataset's size - a display
-    // calibration only, not a change to any weight value itself (still coordination_score/100).
-    const layer = L.heatLayer(points, { radius: 30, blur: 20, max: 0.55, minOpacity: 0.2 }).addTo(map);
+    // leaflet.heat scales every point's weight by f = 1 / 2^clamp(maxZoom - currentZoom, 0, 12)
+    // before drawing (its own zoom-compensation step) - left at the library's maxZoom default
+    // (~18, far above this app's actual operating range around zoom 7-11), f collapses to
+    // ~0.0005 at the default view. At that scale every real score (0.06-0.63) draws far below
+    // minOpacity regardless of value, so the display showed point count, not score - confirmed
+    // by simulating the library's exact arithmetic against the real weight distribution.
+    // Anchoring maxZoom to 11 - the same ceiling FitToProjects/FitToSelection already use
+    // elsewhere in this file's sibling ProjectMap.tsx, not a new constant - and calibrating max
+    // to the resulting single-point range (~0.004-0.04 at zoom 7) keeps the true top score close
+    // to full intensity while leaving headroom for genuine clusters to read hotter still.
+    const layer = L.heatLayer(points, { radius: 30, blur: 20, max: 0.05, minOpacity: 0.05, maxZoom: 11 }).addTo(map);
     return () => {
       map.removeLayer(layer);
     };

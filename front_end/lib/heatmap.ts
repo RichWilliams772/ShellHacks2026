@@ -16,6 +16,11 @@ export function buildHeatPoints(opportunities: Opportunity[]): HeatPoint[] {
   const points: HeatPoint[] = [];
   for (const o of opportunities) {
     const weight = o.analysis.coordination_score / 100;
+    // A score of exactly 0 is a real, calculated "no coordination signal" - leaflet.heat's own
+    // draw() floors every point's rendered alpha to at least `minOpacity` regardless of weight
+    // (Math.max(a[2]/max, minOpacity)), so a zero-score point would still paint a visible blob
+    // if included. Dropping it here is the only way to keep "brighter = stronger score" true.
+    if (weight <= 0) continue;
     for (const p of [o.project_a, o.project_b]) {
       if (p.mid_lat != null && p.mid_lon != null) points.push([p.mid_lat, p.mid_lon, weight]);
     }

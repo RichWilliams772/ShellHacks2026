@@ -107,7 +107,7 @@ export default function OpportunityDetail({ o, onBack }: { o: Opportunity; onBac
         <button type="button" onClick={onBack} className="text-graphite underline hover:text-ink">
           Back to all pairs
         </button>
-        <CopyBriefButton o={o} />
+        <CopyBriefButton key={o.opportunity_id} o={o} />
       </div>
 
       <div className="mt-4 flex items-end justify-between gap-4">

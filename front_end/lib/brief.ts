@@ -50,7 +50,11 @@ function followUpQuestions(o: Opportunity): string[] {
   if (a.schedule_overlap_months == null) {
     questions.push("Confirm the actual construction windows for both projects.");
   }
-  if (o.project_a.geometry_type != null || o.project_b.geometry_type != null) {
+  // Specifically an "approximate_corridor" (a straight line between two known endpoints,
+  // never the real route) - not just any known geometry. A "point" project is a single
+  // substation with no corridor at all, so "routing beyond the known endpoints" doesn't
+  // apply to it and shouldn't be asked about it.
+  if (o.project_a.geometry_type === "approximate_corridor" || o.project_b.geometry_type === "approximate_corridor") {
     questions.push("Verify detailed project routing beyond the known endpoints.");
   }
   if (o.potential_shared_resources.length > 0) {

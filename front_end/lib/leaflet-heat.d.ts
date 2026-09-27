@@ -7,6 +7,7 @@ declare module "leaflet" {
     blur?: number;
     max?: number;
     minOpacity?: number;
+    maxZoom?: number;
   }
   function heatLayer(
     points: Array<[number, number, number]>,
