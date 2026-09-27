@@ -23,3 +23,7 @@ class ProjectNotFoundError(GridSyncError):
 
 class OpportunityNotFoundError(GridSyncError):
     """No cross-utility pair matches the requested opportunity id."""
+
+
+class ScenarioRejected(GridSyncError):
+    """A what-if shift cannot be applied to the selected project."""

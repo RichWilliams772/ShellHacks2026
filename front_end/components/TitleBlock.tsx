@@ -12,32 +12,32 @@ interface Props {
 // Styled after the title block on an engineering drawing: what is being compared, and the result.
 export default function TitleBlock({ summary, loading, onAnalyze }: Props) {
   return (
-    <header className="border-b border-ink bg-sheet">
-      <div className="mx-auto flex max-w-[1500px] flex-wrap items-end justify-between gap-x-8 gap-y-3 px-4 py-4 sm:px-6">
-        <div>
-          <h1 className="font-display text-4xl leading-none font-bold">GridSync</h1>
-          <p className="mt-1 text-graphite">Find where the grid can build together.</p>
+    <header className="gs-network border-b border-rule pt-[env(safe-area-inset-top)]">
+      <div className="mx-auto flex max-w-[1500px] flex-col items-stretch gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-x-8 sm:px-6 sm:py-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-3xl leading-none font-bold tracking-tight sm:text-4xl">GridSync</h1>
+          <p className="mt-1 text-graphite">See the overlap. Build the grid together.</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <p className="flex flex-wrap items-center gap-x-3 font-display text-xl font-semibold">
-            <span className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
+          <p className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 font-display text-lg font-semibold break-words sm:text-xl">
+            <span className="flex min-w-0 items-center gap-2">
               <UtilityMarker shape={utilityShape(UTILITY_A)} color={utilityColor(UTILITY_A)} size={12} />
-              {UTILITY_A}
+              <span className="min-w-0 break-words">{UTILITY_A}</span>
             </span>
             <span className="text-graphite" aria-label="compared with">
               ⟷
             </span>
-            <span className="flex items-center gap-2">
+            <span className="flex min-w-0 items-center gap-2">
               <UtilityMarker shape={utilityShape(UTILITY_B)} color={utilityColor(UTILITY_B)} size={12} />
-              {UTILITY_B}
+              <span className="min-w-0 break-words">{UTILITY_B}</span>
             </span>
           </p>
           <button
             type="button"
             onClick={onAnalyze}
             disabled={loading}
-            className="rounded-sm bg-ink px-5 py-2.5 font-display text-lg font-semibold text-paper hover:bg-redline disabled:cursor-wait disabled:opacity-60"
+            className="min-h-11 w-full rounded-full bg-ink px-5 py-2.5 font-display text-lg font-semibold text-paper hover:bg-cyan hover:text-paper disabled:cursor-wait disabled:opacity-60 sm:min-h-0 sm:w-auto"
           >
             {loading ? "Analyzing…" : "Analyze projects"}
           </button>

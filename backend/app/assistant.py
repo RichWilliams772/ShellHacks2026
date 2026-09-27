@@ -20,11 +20,41 @@ from typing import Protocol
 
 import certifi
 
-from app.models import AssistantTurn, Opportunity, Project
+from app.errors import ScenarioRejected
+from app.models import AssistantTurn, Opportunity, Project, ScenarioOutcome
+from app.scenario import run_scenario
 from app.similarity import type_matches
 
 logger = logging.getLogger(__name__)
 
+_WHAT_IF = re.compile(r"\bwhat[\s-]*if\b", re.IGNORECASE)
+_OPEN_PAIR = re.compile(
+    r"\b(?:this pair|this opportunity|these projects)\b",
+    re.IGNORECASE,
+)
+_OPEN_PAIR_ANSWER = (
+    "Open an opportunity card so I know which pair you mean, then ask again."
+)
+_INCREASE = re.compile(
+    r"\b(increase|increases|increased|increasing|higher|went up|goes up)\b",
+    re.IGNORECASE,
+)
+_EXTRACT_SYSTEM = (
+    "Extract a what-if start-date shift from the planner's question. "
+    "Reply with JSON only. Either "
+    '{"project_id":"<one of the supplied ids>","shift_months":<integer>} '
+    'or {"clarify":"<one question asking which project or how many months>"}. '
+    "shift_months is positive when the start moves later and negative when it moves earlier. "
+    "Use only the supplied project ids. "
+    "Do not calculate or include distances, overlaps, component scores, or a coordination score."
+)
+_SCENARIO_EXPLAIN_SYSTEM = (
+    "Explain this completed GridSync scenario using only the JSON. "
+    "The coordination score and temporal score are already calculated. "
+    "Do not calculate or change them. If the scores are equal, say the score is unchanged. "
+    "Do not describe same-year activity as a confirmed month-level overlap. "
+    "Do not recommend coordinating or estimate savings."
+)
 _SAVINGS_PATTERN = re.compile(
     r"\b(savings|roi|probability|recommend|should we coordinate|financial)\b",
     re.IGNORECASE,
@@ -91,6 +121,7 @@ class AssistantResult:
     opportunities: list[Opportunity]
     llm_used: bool
     llm_configured: bool
+    scenario: ScenarioOutcome | None = None
 
 
 def llm_is_configured(environ: Mapping[str, str] | None = None) -> bool:
@@ -125,6 +156,15 @@ def answer_query(
             llm_used=False,
             llm_configured=configured,
         )
+    if focus_id is None and _OPEN_PAIR.search(query):
+        return AssistantResult(
+            answer=_OPEN_PAIR_ANSWER,
+            note=_ASSISTANT_NOTE,
+            filters_applied={"needs_opportunity": True},
+            opportunities=[],
+            llm_used=False,
+            llm_configured=configured,
+        )
     filters = _filters_from_query(query)
     matched = _context(opportunities, filters, focus_id)
     applied = filters.as_dict()
@@ -140,6 +180,7 @@ def answer_query(
                 matched,
                 filters,
                 "No language model is configured, so this is the structured record only.",
+                focus_id,
             ),
             note=_ASSISTANT_NOTE,
             filters_applied=applied,
@@ -161,6 +202,7 @@ def answer_query(
                 matched,
                 filters,
                 "The explanation service did not respond. This is the structured record only.",
+                focus_id,
             ),
             note=_ASSISTANT_NOTE,
             filters_applied=applied,
@@ -176,6 +218,195 @@ def answer_query(
         llm_used=True,
         llm_configured=configured,
     )
+
+
+def is_scenario_question(query: str) -> bool:
+    return _WHAT_IF.search(query) is not None
+
+
+def answer_scenario_question(
+    query: str,
+    opportunity: Opportunity,
+    *,
+    client: LlmClient | None = None,
+    llm_configured: bool | None = None,
+    history: Sequence[AssistantTurn] | None = None,
+) -> AssistantResult:
+    """Resolve a what-if question through the scenario service, never the model score."""
+    configured = llm_is_configured() if llm_configured is None else llm_configured
+    applied: dict[str, object] = {"scenario": True, "opportunity_id": opportunity.id}
+    if not configured or client is None:
+        return AssistantResult(
+            answer=(
+                "Use the What-If controls on this pair to shift a project with a known "
+                "start date. No language model is configured, so this chat will not "
+                "estimate a scenario score."
+            ),
+            note=_ASSISTANT_NOTE,
+            filters_applied=applied,
+            opportunities=[opportunity],
+            llm_used=False,
+            llm_configured=configured,
+        )
+    try:
+        extracted = client.complete(
+            [
+                {"role": "system", "content": _EXTRACT_SYSTEM},
+                *_history_messages(history, query),
+                {"role": "user", "content": _scenario_choice_payload(query, opportunity)},
+            ]
+        )
+    except Exception:
+        return AssistantResult(
+            answer=(
+                "The explanation service did not respond. Use the What-If controls on "
+                "this pair to shift a project with a known start date."
+            ),
+            note=_ASSISTANT_NOTE,
+            filters_applied=applied,
+            opportunities=[opportunity],
+            llm_used=False,
+            llm_configured=configured,
+        )
+    choice = _parse_scenario_choice(extracted, opportunity)
+    if isinstance(choice, str):
+        return AssistantResult(
+            answer=choice,
+            note=_ASSISTANT_NOTE,
+            filters_applied=applied,
+            opportunities=[opportunity],
+            llm_used=True,
+            llm_configured=configured,
+        )
+    project_id, shift_months = choice
+    try:
+        outcome = run_scenario(opportunity, project_id, shift_months)
+    except ScenarioRejected as exc:
+        return AssistantResult(
+            answer=str(exc),
+            note=_ASSISTANT_NOTE,
+            filters_applied={**applied, "project_id": project_id, "shift_months": shift_months},
+            opportunities=[opportunity],
+            llm_used=True,
+            llm_configured=configured,
+        )
+    applied["project_id"] = project_id
+    applied["shift_months"] = shift_months
+    explanation = outcome.explanation
+    try:
+        model_text = client.complete(
+            [
+                {"role": "system", "content": _SCENARIO_EXPLAIN_SYSTEM},
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {"question": query, "scenario": outcome.model_dump()},
+                    ),
+                },
+            ]
+        )
+    except Exception:
+        model_text = ""
+    if model_text:
+        explanation = _faithful_explanation(model_text, outcome)
+    return AssistantResult(
+        answer=explanation,
+        note=_LLM_NOTE,
+        filters_applied=applied,
+        opportunities=[opportunity],
+        llm_used=True,
+        llm_configured=configured,
+        scenario=outcome,
+    )
+
+
+def _scenario_choice_payload(query: str, opportunity: Opportunity) -> str:
+    projects = []
+    for project in (opportunity.project_a, opportunity.project_b):
+        projects.append(
+            {
+                "project_id": project.id,
+                "project_name": project.project_name,
+                "utility": project.utility,
+                "start_date": project.start_date,
+                "end_date": project.end_date,
+            }
+        )
+    return json.dumps({"question": query, "projects": projects})
+
+
+def _parse_scenario_choice(
+    text: str,
+    opportunity: Opportunity,
+) -> tuple[str, int] | str:
+    payload = _json_object(text)
+    if payload is None:
+        return "Which project should move, and by how many months?"
+    clarify = payload.get("clarify")
+    if isinstance(clarify, str) and clarify.strip():
+        return clarify.strip()
+    project_token = payload.get("project_id")
+    shift = payload.get("shift_months")
+    if not isinstance(project_token, str) or not isinstance(shift, int) or isinstance(shift, bool):
+        return "Which project should move, and by how many months?"
+    project_id = _resolve_project_id(opportunity, project_token)
+    if project_id is None:
+        names = " and ".join(
+            f"{project.project_name} ({project.id})"
+            for project in (opportunity.project_a, opportunity.project_b)
+        )
+        return f"Which project should move? This pair includes {names}."
+    if shift < -36 or shift > 36:
+        return "Which shift do you mean? Enter a whole number of months from -36 to 36."
+    return project_id, shift
+
+
+def _resolve_project_id(opportunity: Opportunity, token: str) -> str | None:
+    text = token.strip()
+    projects = (opportunity.project_a, opportunity.project_b)
+    for project in projects:
+        if project.id == text or project.project_name.casefold() == text.casefold():
+            return project.id
+    folded = text.casefold()
+    matched = [
+        project
+        for project in projects
+        if _utility_token(project.utility, folded)
+    ]
+    if len(matched) == 1:
+        return matched[0].id
+    return None
+
+
+def _utility_token(utility: str, token: str) -> bool:
+    folded = utility.casefold()
+    if token == folded or folded.startswith(token):
+        return True
+    if token in {"teco", "tampa", "tampa electric"} and "tampa electric" in folded:
+        return True
+    if token in {"duke", "duke energy", "duke energy florida"} and "duke" in folded:
+        return True
+    return False
+
+
+def _json_object(text: str) -> dict[str, object] | None:
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE)
+    try:
+        payload = json.loads(cleaned)
+    except json.JSONDecodeError:
+        return None
+    if isinstance(payload, dict):
+        return payload
+    return None
+
+
+def _faithful_explanation(model_text: str, outcome: ScenarioOutcome) -> str:
+    change = outcome.coordination_score_change
+    if (change is None or change <= 0) and _INCREASE.search(model_text):
+        return outcome.explanation
+    return model_text.strip()
 
 
 @dataclass(frozen=True)
@@ -308,8 +539,37 @@ def _fallback_answer(
     opportunities: list[Opportunity],
     filters: _QueryFilters,
     lead: str,
+    focus_id: str | None,
 ) -> str:
-    return f"{lead} {_explain(query, opportunities, filters)}"
+    if focus_id:
+        return f"{lead} {_explain(query, opportunities, filters)}"
+    return f"{lead}\n{_ranked_list(opportunities, filters)}"
+
+
+def _ranked_list(opportunities: list[Opportunity], filters: _QueryFilters) -> str:
+    if not opportunities:
+        return "No pairs matched that question."
+    lines: list[str] = []
+    for index, opportunity in enumerate(opportunities[:5], start=1):
+        score = opportunity.coordination_score
+        label = (
+            _score_label(score)
+            if isinstance(score, (int, float)) and not isinstance(score, bool)
+            else "not available"
+        )
+        line = (
+            f"{index}. {opportunity.project_a.project_name} and "
+            f"{opportunity.project_b.project_name} - coordination score {label}."
+        )
+        if filters.include_resources:
+            resources = opportunity.coordination_package.shared_resources
+            if resources:
+                shared = ", ".join(f"{item.label}: {item.strength}" for item in resources)
+                line = f"{line} {shared}."
+            else:
+                line = f"{line} {opportunity.coordination_package.evidence_note}"
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def _plain(text: str) -> str:

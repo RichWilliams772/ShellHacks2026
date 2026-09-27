@@ -16,7 +16,7 @@ export const UTILITY_COLORS: Record<string, string> = {
   "Tampa Electric": "#e08a12",
 };
 export const FALLBACK_COLORS = ["#2456b8", "#e08a12", "#5b6472"];
-export const REDLINE = "#c8352b";
+export const REDLINE = "#7c3aed";
 
 export const MAP_CENTER: [number, number] = [28.6, -82.3]; // central Florida
 export const MAP_ZOOM = 7;

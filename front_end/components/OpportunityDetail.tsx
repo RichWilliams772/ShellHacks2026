@@ -17,7 +17,8 @@ import {
 import ScoreBadge from "./ScoreBadge";
 import InfoTip from "./InfoTip";
 import UtilityMarker from "./UtilityMarker";
-import CopyBriefButton from "./CopyBriefButton";
+import DownloadBriefButton from "./DownloadBriefButton";
+import ScenarioPanel from "./ScenarioPanel";
 
 function Heading({ children }: { children: React.ReactNode }) {
   return <h3 className="mt-6 mb-2 font-display text-xl font-semibold">{children}</h3>;
@@ -30,7 +31,7 @@ function Row({ label, value, help }: { label: string; value: string; help?: stri
         {label}
         {help && <InfoTip text={help} />}
       </dt>
-      <dd className={`text-right ${value === NA ? "text-graphite italic" : ""}`}>{value}</dd>
+      <dd className={`min-w-0 text-right break-words [overflow-wrap:anywhere] ${value === NA ? "text-graphite italic" : ""}`}>{value}</dd>
     </div>
   );
 }
@@ -45,7 +46,7 @@ function Bar({ label, value }: { label: string; value: number | null }) {
         <span className="font-semibold">{Math.round(value)}</span>
       </div>
       <div className="mt-1 h-1.5 bg-rule">
-        <div className="h-full bg-ink" style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+        <div className="h-full bg-cyan" style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
       </div>
     </div>
   );
@@ -57,7 +58,7 @@ function PotentialPips({ level }: { level: Potential }) {
   return (
     <span className="flex items-center gap-1" aria-label={`${humanize(level.toLowerCase())} potential`}>
       {[1, 2, 3].map((i) => (
-        <span key={i} className={`h-2.5 w-2.5 ${i <= PIPS[level] ? "bg-ink" : "border border-graphite"}`} />
+        <span key={i} className={`h-2.5 w-2.5 ${i <= PIPS[level] ? "bg-violet" : "border border-violet/50"}`} />
       ))}
       <span className="ml-1 w-14 text-sm text-graphite">{humanize(level.toLowerCase())}</span>
     </span>
@@ -68,11 +69,11 @@ function ProjectFacts({ p }: { p: Project }) {
   const s = p.sources;
   return (
     <section className="mt-4">
-      <p className="flex items-center gap-2 font-semibold">
+      <p className="flex min-w-0 items-start gap-2 font-semibold break-words">
         <UtilityMarker shape={utilityShape(p.utility)} color={utilityColor(p.utility)} />
-        {p.name}
+        <span className="min-w-0 break-words">{p.name}</span>
       </p>
-      <p className="text-sm text-graphite">
+      <p className="text-sm break-words text-graphite">
         {p.utility}, {p.id}
       </p>
       <dl className="mt-1">
@@ -83,12 +84,12 @@ function ProjectFacts({ p }: { p: Project }) {
         <Row label="Location confidence" value={p.location_confidence ?? NA} help={CONFIDENCE_HELP} />
         <Row label="Mapped as" value={geometryLabel(p.geometry_type)} />
       </dl>
-      <div className="mt-2 space-y-1 text-sm text-graphite">
+      <div className="mt-2 space-y-1 text-sm break-words text-graphite [overflow-wrap:anywhere]">
         {s.project_source && <p>Project: {s.project_source}</p>}
         {s.circuit_endpoint_source && <p>Circuit endpoints: {s.circuit_endpoint_source}</p>}
         {s.geography_source && <p>Location: {s.geography_source}</p>}
         {s.source_url && (
-          <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="text-ink underline">
+          <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="text-cyan underline">
             Open the project page
           </a>
         )}
@@ -103,33 +104,41 @@ export default function OpportunityDetail({ o, onBack }: { o: Opportunity; onBac
 
   return (
     <article className="px-4 pt-3 pb-8">
-      <div className="flex items-center justify-between gap-3">
-        <button type="button" onClick={onBack} className="text-graphite underline hover:text-ink">
-          Back to all pairs
-        </button>
-        <CopyBriefButton key={o.opportunity_id} o={o} />
-      </div>
-
-      <div className="mt-4 flex items-end justify-between gap-4">
-        <div>
-          <p className="text-graphite">Pair {a.opportunity_rank} of the ranking</p>
-          <p className="text-sm text-graphite">
-            Coordination score
-            <InfoTip text={SCORE_HELP} />
-          </p>
+      <div className="max-sm:sticky max-sm:top-[env(safe-area-inset-top)] max-sm:z-20 max-sm:-mx-4 max-sm:border-b max-sm:border-rule max-sm:bg-sheet max-sm:px-4 max-sm:pt-3 max-sm:pb-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex min-h-11 items-center self-start text-graphite underline hover:text-ink sm:min-h-0"
+          >
+            Back to all pairs
+          </button>
+          <div className="flex min-w-0 flex-col items-stretch gap-2 sm:items-end">
+            <DownloadBriefButton key={o.opportunity_id} opportunityId={o.opportunity_id} />
+          </div>
         </div>
-        <ScoreBadge score={a.coordination_score} size="lg" />
+
+        <div className="mt-3 flex items-end justify-between gap-4 sm:mt-4">
+          <div className="min-w-0">
+            <p className="text-graphite">Pair {a.opportunity_rank} of the ranking</p>
+            <p className="text-sm text-graphite">
+              Coordination score
+              <InfoTip text={SCORE_HELP} />
+            </p>
+          </div>
+          <ScoreBadge score={a.coordination_score} size="lg" />
+        </div>
       </div>
       {a.score_confidence && (
         <p className="mt-1 text-right text-sm text-graphite">{humanize(a.score_confidence.toLowerCase())} confidence in the inputs</p>
       )}
 
-      <h2 className="mt-4 font-display text-2xl leading-tight font-semibold">
+      <h2 className="mt-4 font-display text-2xl leading-tight font-semibold break-words">
         {o.project_a.name}
         <span className="block text-graphite">and {o.project_b.name}</span>
       </h2>
 
-      <dl className="mt-4 grid grid-cols-2 gap-4 border-y border-ink py-3">
+      <dl className="mt-4 grid grid-cols-2 gap-4 border-y border-rule py-3">
         <div>
           <dt className="text-sm text-graphite">Distance</dt>
           <dd className="font-display text-2xl font-semibold text-redline">{fmtMiles(a.distance_miles)}</dd>
@@ -145,7 +154,7 @@ export default function OpportunityDetail({ o, onBack }: { o: Opportunity; onBac
 
       <Heading>Why this pair matched</Heading>
       {o.evidence.length > 0 ? (
-        <ul className="list-disc space-y-1 pl-5">
+        <ul className="list-disc space-y-1 pl-5 break-words">
           {o.evidence.map((e, i) => (
             <li key={i}>{readableEvidence(e)}</li>
           ))}
@@ -156,10 +165,10 @@ export default function OpportunityDetail({ o, onBack }: { o: Opportunity; onBac
 
       <Heading>What they could coordinate</Heading>
       {resources.length > 0 ? (
-        <ul>
+        <ul className="rounded-md border border-violet/40 bg-violet/10 px-3">
           {resources.map((r) => (
-            <li key={r.resource_id} className="flex items-center justify-between gap-3 border-b border-rule py-1.5 last:border-0">
-              <span>
+            <li key={r.resource_id} className="flex flex-col items-start gap-2 border-b border-violet/25 py-2 last:border-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-1.5">
+              <span className="min-w-0 break-words">
                 {r.display_name}
                 {r.evidence.length > 0 && <InfoTip text={r.evidence.join(" ")} />}
               </span>
@@ -184,10 +193,12 @@ export default function OpportunityDetail({ o, onBack }: { o: Opportunity; onBac
       <ProjectFacts p={o.project_a} />
       <ProjectFacts p={o.project_b} />
 
-      <p className="mt-6 border-t border-rule pt-3 text-sm text-graphite">
+      <p className="mt-6 border-t border-rule pt-3 text-sm break-words text-graphite">
         The score measures how strong a coordination opportunity looks in public planning data. It does not predict
         whether utilities will coordinate or how much they would save. Planners decide.
       </p>
+
+      <ScenarioPanel key={o.opportunity_id} opportunity={o} />
     </article>
   );
 }

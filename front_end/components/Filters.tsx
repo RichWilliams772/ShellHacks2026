@@ -28,11 +28,11 @@ interface Props {
 
 export default function Filters({ value, onChange, years, projectTypes }: Props) {
   const set = <K extends keyof FilterState>(k: K, v: FilterState[K]) => onChange({ ...value, [k]: v });
-  const label = "text-sm text-graphite";
-  const input = "mt-1 w-full rounded-sm border border-rule bg-sheet px-2 py-1 text-ink";
+  const label = "min-w-0 text-sm break-words text-graphite";
+  const input = "mt-1 w-full min-w-0 rounded-sm border border-rule bg-paper px-2 py-1 text-ink max-sm:min-h-11";
 
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-ink px-4 py-3">
+    <div className="grid grid-cols-1 gap-x-4 gap-y-3 border-b border-rule px-4 py-3 min-[380px]:grid-cols-2">
       <label className={label}>
         Active in
         <select
@@ -68,7 +68,7 @@ export default function Filters({ value, onChange, years, projectTypes }: Props)
           step={5}
           value={value.maxDistance}
           onChange={(e) => set("maxDistance", Number(e.target.value))}
-          className="mt-2 w-full accent-ink"
+          className="mt-2 h-11 w-full accent-cyan sm:h-auto"
         />
       </label>
       <label className={label}>
@@ -80,7 +80,7 @@ export default function Filters({ value, onChange, years, projectTypes }: Props)
           step={5}
           value={value.minScore}
           onChange={(e) => set("minScore", Number(e.target.value))}
-          className="mt-2 w-full accent-ink"
+          className="mt-2 h-11 w-full accent-cyan sm:h-auto"
         />
       </label>
     </div>

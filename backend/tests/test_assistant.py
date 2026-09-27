@@ -70,15 +70,15 @@ def test_assistant_answers_from_structured_results() -> None:
         "/assistant/query",
         json={"query": "Why did GridSync match these projects?"},
     )
-    top_reason = why.json()["opportunities"][0]["reasons"][0]
-    answer = why.json()["answer"]
-    assert "Why it matched" in answer
-    assert "What's missing" in answer
-    assert top_reason.replace("_", " ") in answer or "Both projects involve" in answer
+    assert why.json()["answer"] == (
+        "Open an opportunity card so I know which pair you mean, then ask again."
+    )
+    assert why.json()["llm_used"] is False
+    assert why.json()["opportunities"] == []
 
     resources = client.post(
         "/assistant/query",
-        json={"query": "What resources could these projects potentially coordinate?"},
+        json={"query": "What resources could the strongest opportunities potentially coordinate?"},
     )
     package = resources.json()["opportunities"][0]["coordination_package"]
     if package["shared_resources"]:

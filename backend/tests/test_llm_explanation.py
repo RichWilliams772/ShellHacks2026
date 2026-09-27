@@ -284,6 +284,72 @@ def test_selected_follow_up_stays_on_one_opportunity(
     assert "DUKE-P0313" not in sent[-1]["content"]
 
 
+def test_unselected_pair_question_asks_for_a_card(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GRIDSYNC_LLM_API_KEY", "test-key")
+    fake = FakeLlm("should not be used")
+    client.app.state.llm_client = fake
+    for query in (
+        "Why did GridSync surface this pair?",
+        "Why did this opportunity match?",
+        "Why did GridSync match these projects?",
+    ):
+        response = client.post("/assistant/query", json={"query": query})
+        assert response.status_code == 200
+        body = response.json()
+        assert body["answer"] == (
+            "Open an opportunity card so I know which pair you mean, then ask again."
+        )
+        assert body["llm_used"] is False
+        assert body["llm_configured"] is True
+        assert body["opportunities"] == []
+        assert "Why it matched" not in body["answer"]
+    assert fake.messages == []
+    assert "should not be used" not in response.text
+
+
+def test_selected_pair_explanation_stays_detailed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GRIDSYNC_LLM_API_KEY", raising=False)
+    client.app.state.llm_client = None
+    response = _ask(TOP_ID, "Why did GridSync surface this pair?")
+    assert response.status_code == 200
+    body = response.json()
+    answer = body["answer"]
+    assert body["llm_used"] is False
+    assert body["opportunities"][0]["id"] == TOP_ID
+    assert "Why it matched" in answer
+    assert "What's missing" in answer
+    assert "Open an opportunity card" not in answer
+    assert "63.3" in answer
+
+
+def test_ranked_question_uses_a_numbered_list_when_gemini_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GRIDSYNC_LLM_API_KEY", "test-key")
+    fake = FakeLlm(error=LlmCallError("provider down"))
+    client.app.state.llm_client = fake
+    response = client.post(
+        "/assistant/query",
+        json={"query": "Show the strongest opportunities."},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    answer = body["answer"]
+    assert body["llm_used"] is False
+    assert body["llm_configured"] is True
+    assert "did not respond" in answer
+    assert "Why it matched" not in answer
+    assert "What's missing" not in answer
+    assert "1. " in answer
+    assert "2. " in answer
+    assert "63.3" in answer
+    assert body["opportunities"][0]["id"] == TOP_ID
+    scores = [item["coordination_score"] for item in body["opportunities"]]
+    assert scores == sorted(scores, reverse=True)
+    assert 1 <= len(body["opportunities"]) <= 5
+    assert len(fake.messages) == 1
+
+
 def test_general_question_without_a_key_stays_structured(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -297,6 +363,8 @@ def test_general_question_without_a_key_stays_structured(
     body = response.json()
     assert body["llm_used"] is False
     assert "No language model is configured" in body["answer"]
+    assert "Why it matched" not in body["answer"]
+    assert "1. " in body["answer"]
     assert "63.3" in body["answer"]
     assert 1 <= len(body["opportunities"]) <= 5
 
