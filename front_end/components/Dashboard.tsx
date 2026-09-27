@@ -95,7 +95,12 @@ export default function Dashboard() {
       <TitleBlock summary={ready ? data!.summary : null} loading={status === "loading"} onAnalyze={runAnalysis} />
 
       <main className="grid flex-1 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_440px]">
-        <MapPanel projects={ready ? mapProjects : []} selected={selected} onSelectProject={selectByProject} />
+        <MapPanel
+          projects={ready ? mapProjects : []}
+          selected={selected}
+          onSelectProject={selectByProject}
+          opportunities={ready ? filtered : []}
+        />
 
         <aside className="flex flex-col border-t border-ink lg:min-h-0 lg:border-t-0 lg:border-l">
           <div ref={sideRef} className="min-h-0 flex-1 lg:overflow-y-auto">
